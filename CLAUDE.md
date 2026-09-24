@@ -1,30 +1,46 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Project Overview
 
 StreamTube — a video sharing platform (YouTube-like). Users can upload, manage, and publish videos. Anonymous users can watch freely; social features (comments, subscriptions, likes) require authentication.
 
-More info in the project overview: [docs/project-plan.md](docs/project-plan.md)
+More info in the project overview: [docs/project-plan.md](docs/project-plan.md). Phases 01 (base setup) and 02 (auth, backend + frontend) are done; phases 03–07 (video upload/processing → search) are planned.
 
 ## Repository Structure
 
-This is a monorepo with two main areas:
+Monorepo with two subprojects, each with its **own** `CLAUDE.md` holding the detailed commands, test conventions and architecture — read the one for the subproject you are touching:
 
-- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for users, channels, videos, comments, etc.
-- `docs/` — Project documentation, architecture diagrams, and planning.
-- `next-frontend/` (Next.js) — not yet initialized
+- `nestjs-project/` — Backend API (NestJS 11, TypeORM, PostgreSQL 17, Mailpit). See [nestjs-project/CLAUDE.md](nestjs-project/CLAUDE.md).
+- `next-frontend/` — Frontend (Next.js 16 App Router, React 19, Tailwind 4, shadcn/ui). See [next-frontend/CLAUDE.md](next-frontend/CLAUDE.md).
+- `docs/` — project plan, technical decisions, phase/task plans, diagrams.
+- `scripts/` — host-side helper scripts (e.g., `sync-openapi.sh`).
+- `.claude/rules/` — path-scoped rules (load automatically when editing matching files: controllers, DTOs, entities, migrations, BFF routes, tests…). `.claude/skills/` and `.claude/agents/` hold the planning pipeline.
 
 ## Architecture (C4 Container Diagram)
 
 See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
-- **Frontend** (Next.js) → calls API via REST, streams from Object Storage
-- **API** (Nest.js) → business rules, auth, reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
+- **Frontend** (Next.js) → strict **BFF**: the browser only calls same-origin Route Handlers in `app/api/**`, which proxy server-side to the API. Streams media from Object Storage.
+- **API** (Nest.js) → business rules, auth (JWT + refresh-token rotation, global `JwtAuthGuard` with `@Public()` opt-out), reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
+- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage *(planned — phase 03)*
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
-- **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
-- **Email Service** (SMTP) → account confirmation and password recovery
+- **Object Storage** (S3/MinIO) → video files and thumbnails *(planned)*
+- **Message Queue** (TBD) → video processing job queue *(planned)*
+- **Email Service** (SMTP; Mailpit in dev, UI at http://localhost:8025) → account confirmation and password recovery
+
+### OpenAPI contract between subprojects
+
+The backend's OpenAPI spec is the single source of truth for every wire shape on the frontend (BFF handlers, MSW fixtures, component types). When an endpoint or DTO changes, regenerate the chain in this order:
+
+```bash
+cd nestjs-project && docker compose exec nestjs-api npm run openapi:export   # writes nestjs-project/openapi.json
+bash scripts/sync-openapi.sh                                                  # from repo root, on the HOST
+cd next-frontend && docker compose exec next-frontend npm run openapi:types  # writes lib/api/types.gen.ts
+```
+
+Commit `nestjs-project/openapi.json`, `next-frontend/openapi.json` and `next-frontend/lib/api/types.gen.ts` together. Never hand-edit `types.gen.ts` or duplicate DTOs on the frontend.
 
 ## Docker Networking
 
@@ -36,6 +52,35 @@ Inside a container, `localhost` refers to the container itself, not the host mac
 - **Wrong:** `DB_HOST=localhost`
 
 This applies to all environment variables, configuration files, and code that references service hosts.
+
+**Exception — the two subprojects are separate Compose stacks** (each has its own `compose.yaml`, run from inside its directory). Until they share a network, the frontend reaches the API via `API_URL=http://host.docker.internal:3000` (`next-frontend/.env.local` + `extra_hosts` in its compose).
+
+## Commands (quick reference)
+
+All `npm`/`npx`/`tsc` commands run **inside the container** (`docker compose exec <service> …`, from the subproject dir) — never on the host. The only host-side exceptions are Playwright (`npx playwright test` in `next-frontend/`) and `scripts/*.sh`.
+
+| | Backend (`nestjs-project/`, service `nestjs-api`) | Frontend (`next-frontend/`, service `next-frontend`) |
+|---|---|---|
+| Start env | `docker compose up -d` (API + `db` + `mailpit`) | `docker compose up -d` |
+| First run | `npm install` then `npm run migration:run` (synchronize is off) | `npm install` |
+| Dev server | `npm run start:dev` (port 3000, run in background) | `npm run dev` (host port 3001, run in background) |
+| All tests | `npm test` (unit + integration) and `npm run test:e2e` | `npm test` (Vitest) and `npx playwright test` on host |
+| Single test | `npm test -- path/to/file.spec.ts` | `npm test -- path/to/file.test.ts` / `npx playwright test tests/x.e2e-spec.ts` |
+| Type-check | `npx tsc --noEmit` | `npx tsc --noEmit` |
+| Lint | `npm run lint` | `npm run lint` |
+
+"Start the environment" means containers/infra only — start the dev servers only when explicitly asked. Backend integration/e2e suites share one DB and must run `--runInBand`. Playwright requires the frontend dev server started with `MSW_ENABLED=true` (details in `next-frontend/CLAUDE.md`).
+
+## Planning Workflow (docs/)
+
+Work is planned before it is implemented, via project skills in `.claude/skills/`:
+
+- `/research` → `docs/decisions/technical-decisions-*.md` (TDs with options; the user decides). `/decide` triages free-text decision changes against existing TDs.
+- `/screen-inventory` (frontend) → `docs/inventories/`, mapping Figma screens to capabilities.
+- Plan pipeline `plan-context → plan-validate → plan-resolve → plan-build → plan-test-specs` → `docs/phases/phase-NN-{slug}/` (for a project-plan phase) or `docs/tasks/task-{slug}/` (ad-hoc task). Each folder holds `context.md`, the plan (`phase-NN-{slug}.md` / `task-{slug}.md`, split into SIs), `progress.md` and `validation.md`.
+- `/implement` executes a plan SI by SI, running the relevant tests after each.
+
+When a plan exists for the work at hand, follow it and update its `progress.md`. The design system source is `FC Tube.fig` at the repo root; frontend tokens derive from it into `next-frontend/app/globals.css`.
 
 ## Working Principles
 
