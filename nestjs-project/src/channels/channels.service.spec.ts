@@ -2,7 +2,21 @@ import { QueryFailedError } from 'typeorm';
 import { ChannelsService } from './channels.service';
 import { Channel } from './entities/channel.entity';
 
-function makeManager(overrides: Record<string, jest.Mock> = {}): any {
+interface MockEntityManager {
+  findOne: jest.Mock;
+  create: jest.Mock;
+  save: jest.Mock;
+}
+
+// Mirrors the pg driver fields TypeORM copies onto QueryFailedError.
+type PgUniqueViolationError = QueryFailedError & {
+  code: string;
+  detail: string;
+};
+
+function makeManager(
+  overrides: Partial<MockEntityManager> = {},
+): MockEntityManager {
   return {
     findOne: jest.fn(),
     create: jest.fn(),
@@ -24,7 +38,11 @@ function makeChannel(nickname: string): Channel {
 }
 
 function makeUniqueError(): QueryFailedError {
-  const err = new QueryFailedError('INSERT', [], new Error()) as any;
+  const err = new QueryFailedError(
+    'INSERT',
+    [],
+    new Error(),
+  ) as PgUniqueViolationError;
   err.code = '23505';
   err.detail = 'Key (nickname)=(abc) already exists.';
   return err;
