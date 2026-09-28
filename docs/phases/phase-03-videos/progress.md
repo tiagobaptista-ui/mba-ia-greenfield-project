@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 5/12 completed
+**SIs:** 6/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -45,9 +45,13 @@
   - `VideosModule` now provides `VideosService` (imports `StorageModule`, `ChannelsModule`).
 
 ### SI-03.6 — Implementar assinatura de partes, conclusão, aborto e consulta do upload
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `src/videos/videos.service.spec.ts` (+17 unit: not found / access denied, part URLs + expiry, out-of-range part, non-draft state, complete → processing + enqueue, 3 × invalid part sets rejected before storage, 4xx storage rejection → `INVALID_UPLOAD_PARTS` keeping the draft, non-client failure rethrown, 2 × size mismatch → object deleted + `failed`, abort, abort non-draft) and `src/videos/videos.service.integration-spec.ts` (+3 — real DB + MinIO + Redis: complete → `processing` + job in the queue, declared/real size mismatch → `failed` + object deleted + no job, abort → draft removed + upload id invalid); `src/videos` suites 38 passing; e2e re-run (AppModule now wires the queue): 52 passing
+- **Observations:**
+  - A 4xx `S3ServiceException` from `CompleteMultipartUpload` (InvalidPart, InvalidPartOrder, EntityTooSmall, NoSuchUpload…) maps to `INVALID_UPLOAD_PARTS`; any other failure propagates unchanged.
+  - On `UPLOAD_SIZE_MISMATCH` the `failed` state and `processing_error` are persisted **before** the exception is thrown, so the DB reflects the terminal state (TD-10/TD-13).
+  - `completeUpload` updates the row to `processing` and then enqueues; the worker ignores jobs whose video is not `processing` (SI-03.9), so the order is safe on retries.
+  - `VideosModule` now imports `QueueModule`.
 
 ### SI-03.7 — Expor endpoints de upload (VideosController + VideosModule)
 - **Status:** pending
