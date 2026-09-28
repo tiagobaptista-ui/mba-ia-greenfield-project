@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/12 completed
+**SIs:** 10/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -79,9 +79,14 @@
   - `VideoProcessor` is not registered in `AppModule` (the API never consumes jobs, TD-06); it is wired by the worker entrypoint in SI-03.10.
 
 ### SI-03.10 — Criar entrypoint do worker e serviço video-worker no Compose
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `src/worker/worker.module.spec.ts` (2 — `WorkerModule` compiles against the real DB/Redis/MinIO and resolves `VideoProcessor` (a `WorkerHost`), `VideosService`, `StorageService`, `FfmpegService`; declares no controllers). Full suite after the change: 228 unit + integration, 59 e2e passing; tsc 0; lint 0 errors
+- **Observations:**
+  - ACs verified against the running stack: `docker compose up -d` brings `video-worker` up next to `nestjs-api`, `db`, `mailpit`, `minio`, `redis` (no published ports; application context only — no HTTP server); its log shows `[VideoWorker] Consuming the video-processing queue`. A smoke run (real clip PUT to MinIO, `processing` row, `process-video` enqueued on the dev prefix `streamtube`) was consumed by the container: log `process-video <id>: attempt 1/3` → `ready (4.00 s)`, row `ready` with h264/aac 320×240 @ 25 fps and `thumbnails/<id>.jpg` (6.9 KB `image/jpeg`) in MinIO; smoke data removed afterwards. The API → worker path over HTTP is exercised by `test/videos-playback.e2e-spec.ts` 6.1 (SI-03.11).
+  - Bug caught by the module test: with `autoLoadEntities`, the worker only knew `Channel`/`Video`, and `Channel#user` failed metadata building (the API gets `User` through `AuthModule → UsersModule`). `WorkerModule` imports `UsersModule` to complete the `Video → Channel → User` graph.
+  - Both containers bind-mount the project and `nest-cli.json` has `deleteOutDir: true`, so two `nest start --watch` would wipe each other's `dist/`. `start:worker:dev` compiles with `tsconfig.worker.json` (`outDir: ./dist-worker`, git-ignored and excluded in `tsconfig.json`); `start:worker` (`node dist/main-worker`) is the production path after `nest build`.
+  - Deviation (scope-preserving): the `ConfigModule.forRoot` and `TypeOrmModule.forRootAsync` blocks moved from `AppModule` to `src/config/root-config.ts` / `src/database/root-typeorm.ts` so the API and the worker load and validate exactly the same environment (TD-06 "same codebase"); `AppModule` behavior is unchanged (full e2e green).
+  - `VideosController` comes along with `VideosModule`, but an application context never binds routes; `WorkerModule` itself declares none.
 
 ### SI-03.11 — Expor streaming, download e thumbnail (endpoints públicos)
 - **Status:** pending

@@ -82,6 +82,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # Video processing worker (phase-03-videos/TD-06): same image and code as the API, second
+  # entrypoint (src/main-worker.ts), no HTTP server and no published ports. It shares the
+  # bind-mounted node_modules, so `npm install` must have run in nestjs-api first; the
+  # restart policy covers that first boot. Builds into dist-worker/ so its watcher never
+  # clobbers the API's dist/.
+  video-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["npm", "run", "start:worker:dev"]
+    restart: unless-stopped
+    volumes:
+      - .:/home/node/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
 volumes:
   minio-data:
   redis-data:
