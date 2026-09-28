@@ -6,5 +6,5 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFiles": ["<rootDir>/test/set-test-env.ts", "dotenv/config"]
+  "setupFiles": ["<rootDir>/set-test-env.ts", "dotenv/config"]
 }

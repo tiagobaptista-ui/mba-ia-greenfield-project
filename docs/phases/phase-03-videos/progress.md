@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 2/12 completed
+**SIs:** 3/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -21,9 +21,12 @@
   - `Content-Disposition` file names are ASCII-sanitized (quotes/backslashes/non-printables → `_`) so a user file name cannot break the header.
 
 ### SI-03.3 — Criar entidade Video e migration CreateVideos
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 8 passing (`src/videos/entities/video.entity.integration-spec.ts` — 6: app-generated id + default `draft`, unique slug, invalid enum rejected, `ON DELETE CASCADE`, 10 GiB `size_bytes` as number, jsonb/duration round-trip; `src/database/migrations.integration-spec.ts` — 2: up with 3 migrations, revert removes `videos` + `videos_status_enum`). Full suites re-run because 10 existing test files changed: 161 unit/integration + 52 e2e passing.
+- **Observations:**
+  - Migration generated with the CLI (`1790616024522-CreateVideos.ts`) *before* any test ran with `Video` — integration tests use `synchronize`, which would otherwise have created the table and left the generator with an empty diff.
+  - Deviation (scope-preserving): the inverse `Channel.videos` relation makes every DataSource that loads `Channel` require `Video`, so (a) `Video` was added to the `ALL_ENTITIES` list of the 10 existing test files and (b) a skeleton `src/videos/videos.module.ts` (only `TypeOrmModule.forFeature([Video])`) was registered in `AppModule` now, instead of in SI-03.7 — otherwise `AppModule` (e2e) fails metadata building. SI-03.7 completes the module.
+  - Fixed an SI-03.1 slip found by the full e2e run: `test/jest-e2e.json` has `rootDir: "."` resolved relative to `test/`, so its setup file is `<rootDir>/set-test-env.ts`.
 
 ### SI-03.4 — Criar fila video-processing e VideoProcessingProducer
 - **Status:** pending
