@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 7/12 completed
+**SIs:** 8/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -62,9 +62,12 @@
   - Response shapes live in `src/videos/dto/video-responses.dto.ts` (classes consumed by the Swagger CLI plugin for the OpenAPI contract); throttle limits in `videos.constants.ts` (`OWNER_READ_THROTTLE` 60/60 s).
 
 ### SI-03.8 — Implementar FfmpegService (metadados e thumbnail)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 10 passing — `src/media/ffmpeg.service.spec.ts` (7: video+audio normalization, no audio → `audio_codec` null, fallback to stream duration/`r_frame_rate`, no video stream → `InvalidMediaError`, duration `N/A` → `InvalidMediaError`, `thumbnailPosition(3)` = 0.3, `thumbnailPosition(3600)` = 60), `src/media/ffmpeg.service.integration-spec.ts` (3 — real ffprobe/ffmpeg 5.1.9 on the generated 3 s clip: duration ≈ 3, h264/aac 320×240 @ 25 fps; text file → `InvalidMediaError`; extracted frame is a non-empty JPEG `FF D8`)
+- **Observations:**
+  - `normalizeProbeOutput` and `thumbnailPosition` are exported pure functions so the unit test covers the JSON normalization without spawning processes; `FfmpegService` only spawns `ffprobe`/`ffmpeg` (with timeouts and SIGKILL) and maps a non-zero ffprobe exit to `InvalidMediaError` (TD-13).
+  - `InvalidMediaError` lives in `src/media/media.errors.ts` as a plain `Error` (not a `DomainException`): it never reaches HTTP, the worker turns it into a terminal `failed` status.
+  - `src/test/video-fixture.ts` generates the clip with `lavfi` `testsrc` + `sine` (libx264/aac) in a temp dir — no binary fixture committed.
 
 ### SI-03.9 — Implementar VideoProcessor (processamento em segundo plano)
 - **Status:** pending
