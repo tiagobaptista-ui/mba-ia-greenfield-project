@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 6/12 completed
+**SIs:** 7/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -54,9 +54,12 @@
   - `VideosModule` now imports `QueueModule`.
 
 ### SI-03.7 — Expor endpoints de upload (VideosController + VideosModule)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `test/videos-upload.e2e-spec.ts` (7 — authored from `nestjs-project/specs/videos-upload.plan.md`: 1.1 create draft, 1.2 401/`UNSUPPORTED_VIDEO_FORMAT`/`VALIDATION_ERROR`, 2.1 owner part URLs on the public host + 403 `VIDEO_ACCESS_DENIED`, 2.2 30 calls without 429, 3.1 real PUT of the part + complete → 202 `processing` + queued job, 4.1 abort → 204 / 409 `INVALID_VIDEO_STATE`, 5.1 owner details + 404 `VIDEO_NOT_FOUND`); `src/videos/videos.module.spec.ts` (1). Full e2e: 59 passing.
+- **Observations:**
+  - `npm run test:e2e` did not pass `--runInBand` (despite `nestjs-project/CLAUDE.md` stating it was already configured); with a 4th e2e suite Jest ran suites in parallel on the shared DB and `cleanAllTables` raced with other suites (FK violations). Fixed the script to `jest --config ./test/jest-e2e.json --runInBand`.
+  - Added `test/helpers/auth-session.ts` (register → capture confirmation token → confirm → login via the real endpoints), shared by the video e2e suites.
+  - Response shapes live in `src/videos/dto/video-responses.dto.ts` (classes consumed by the Swagger CLI plugin for the OpenAPI contract); throttle limits in `videos.constants.ts` (`OWNER_READ_THROTTLE` 60/60 s).
 
 ### SI-03.8 — Implementar FfmpegService (metadados e thumbnail)
 - **Status:** pending

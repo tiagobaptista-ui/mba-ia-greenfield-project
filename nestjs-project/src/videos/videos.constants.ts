@@ -13,3 +13,8 @@ export const SLUG_MAX_RETRIES = 5;
 export const SLUG_COLUMN = 'slug';
 export const DEFAULT_VIDEO_TITLE = 'Untitled video';
 export const PROCESSING_ERROR_MAX_LENGTH = 500;
+
+// phase-03-videos/TD-11 — dedicated limits so real uploads/players are not blocked by the
+// global auth-sized limit (10 req/60 s).
+export const OWNER_READ_THROTTLE = { default: { limit: 60, ttl: 60_000 } };
+export const PLAYBACK_THROTTLE = { default: { limit: 120, ttl: 60_000 } };
