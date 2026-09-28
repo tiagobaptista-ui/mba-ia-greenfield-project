@@ -386,6 +386,37 @@ _Subprojects in scope:_
 
 ---
 
+## TD-13: Accepted Formats and Upload Validation Policy
+
+**Scope:** Backend
+
+**Capability:** Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+
+**Context:** Raised by `plan-validate` (MD-1). With TD-04's presigned multipart, the API never sees the bytes, so it cannot inspect the file while it is uploaded: the client *declares* name, size and type at init, and the object only exists in storage after completion. The policy must say which formats are accepted, where validation happens, and how the 10GB limit is enforced when the declared size could be a lie. It is cited by the init DTO, the complete step, the worker and the OpenAPI contract. Depends on TD-04, TD-05, TD-07, TD-10.
+
+**Options:**
+
+### Option A: Declared allowlist at init + real checks at complete and in the worker
+- Init accepts only an allowlist of video MIME types / extensions (e.g. `video/mp4`, `video/webm`, `video/quicktime`, `video/x-matroska`) and `size_bytes ≤ 10 GiB`. On complete, the API reads the real object size (`HeadObject`) and rejects/aborts if it exceeds 10 GiB or differs from the declared size. In the worker, `ffprobe` is the authority: no video stream / unreadable container → `failed` with a reason.
+- **Pros:** cheap early rejection of obviously wrong files (fast feedback, no wasted upload); the declared-vs-real size check closes the "lie at init" gap; `ffprobe` catches renamed non-video files without any byte inspection in the API.
+- **Cons:** the allowlist must be maintained; a file with a valid extension but broken content still uploads fully before failing in the worker.
+
+### Option B: Size-only check at init, worker decides everything else
+- Init validates only `size_bytes ≤ 10 GiB`; any type is accepted; `ffprobe` in the worker marks non-videos as `failed`.
+- **Pros:** simplest contract; no allowlist to maintain; any container FFmpeg can read is accepted.
+- **Cons:** users can upload 10GB of non-video before learning it fails; the real object size is never re-checked, so the 10GB cap can be bypassed by under-declaring.
+
+### Option C: Magic-byte sniffing in the API at complete
+- On complete, the API fetches the first bytes of the object (ranged `GetObject`) and checks container signatures before enqueueing.
+- **Pros:** rejects non-video content before any worker time is spent.
+- **Cons:** duplicates what `ffprobe` already does authoritatively; container signatures are format-specific and incomplete (e.g. MKV/WebM share EBML headers, MP4 variants differ); extra storage round-trip inside a request.
+
+**Recommendation:** **Option A** — a declared allowlist gives immediate feedback without touching the bytes, the `HeadObject` check at complete makes the 10 GiB cap enforceable despite client-declared sizes, and `ffprobe` in the worker (already required by TD-07) is the single authority on "is this really a video", avoiding a second, weaker format detector in the API.
+
+**Decision:** _[pending]_
+
+---
+
 ## Decisions Summary
 
 | ID | Scope | Decision | Recommendation | Choice |
@@ -402,3 +433,4 @@ _Subprojects in scope:_
 | TD-10 | Backend | Video status lifecycle and failure handling | A — `draft → processing → ready \| failed`, 3 attempts + backoff | _[pending]_ |
 | TD-11 | Backend | Access policy for video endpoints in Phase 03 | A — owner-only upload control; public playback of `ready` videos by slug | _[pending]_ |
 | TD-12 | Backend | Testing strategy for storage, queue and worker | A — real MinIO/Redis/FFmpeg, isolated test queue prefix | _[pending]_ |
+| TD-13 | Backend | Accepted formats and upload validation policy | A — MIME/extension allowlist at init, real size check at complete, `ffprobe` authority in worker | _[pending]_ |
