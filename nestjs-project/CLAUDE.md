@@ -84,8 +84,13 @@ npx tsc --noEmit                         # Type-check (required before declaring
 npm run lint                             # ESLint with auto-fix
 npm run format                           # Prettier formatting
 
-npm run openapi:export                   # Write openapi.json (see the root CLAUDE.md for the frontend sync chain)
+npm run openapi:export                   # Regenerate src/metadata.ts, then write openapi.json (see the root CLAUDE.md for the frontend sync chain)
+npm run openapi:metadata                 # Only regenerate src/metadata.ts (Swagger CLI plugin metadata)
 ```
+
+`src/metadata.ts` is **generated** (`src/swagger/generate-metadata.ts`, using the plugin options in `nest-cli.json`) and committed — never edit it by hand.
+- **Why it exists:** ts-node (`openapi:export`) and ts-jest don't run the `@nestjs/swagger` CLI plugin, so `exportSpec` and `main.ts` load this file with `SwaggerModule.loadPluginMetadata` to get the same DTO schemas `nest build` produces.
+- **Keeping it in sync:** after changing a DTO, run `npm run openapi:export`. `src/swagger/generate-metadata.integration-spec.ts` fails `npm test` while the file is stale.
 
 `npm run start:worker:dev` (`nest start --watch --entryFile main-worker -p tsconfig.worker.json`) is the `video-worker` container's command — you don't run it by hand. It builds into `dist-worker/` (git-ignored) instead of `dist/`: both containers bind-mount the project and `nest-cli.json` has `deleteOutDir: true`, so sharing `dist/` would make each watcher wipe the other's build.
 
@@ -132,6 +137,8 @@ Choose the suffix by what the test really does, not by where the code under test
 | `*.e2e-spec.ts`         | **End-to-end** — full HTTP cycle via `supertest`                     | Required          | `nestjs-project/test/`       |
 
 A test that constructs a `TypeOrmModule.forRoot`, opens a connection, or hits the `db` service **must** be `*.integration-spec.ts`, never `*.spec.ts`. A test that boots the full Nest application and makes HTTP calls **must** be `*.e2e-spec.ts`.
+
+The one exception is **module compilation tests**. They are named `*.module.spec.ts` (e.g. `src/videos/videos.module.spec.ts`, `src/worker/worker.module.spec.ts`) and compile the module against the real Compose services — TypeORM, Redis, MinIO — to catch DI wiring errors that TypeScript cannot. This follows the testing guide: `.claude/skills/testing-guide-nestjs-project/artifacts/modules.md`. They only resolve providers and assert nothing about data.
 
 Conventions for **how to write** each kind of test (mocking patterns, AAA structure, override strategies for global guards, etc.) live in `.claude/rules/nestjs-testing.md` and load when you edit a test file.
 

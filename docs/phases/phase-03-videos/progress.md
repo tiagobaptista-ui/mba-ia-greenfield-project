@@ -101,7 +101,16 @@
 - **Observations:**
   - Contract chain run: `openapi:export` → `scripts/sync-openapi.sh` → `openapi:types`. `nestjs-project/openapi.json` and `next-frontend/openapi.json` are byte-identical, and a second `openapi:types` produced no diff in `types.gen.ts` (same md5). Frontend DoD after the regen: `tsc` 0, lint 0 errors, Vitest 67 passing.
   - `next-frontend/openapi.json` is git-ignored (`next-frontend/.gitignore`). The root `CLAUDE.md` said to commit it; it now says to commit `nestjs-project/openapi.json` + `types.gen.ts`.
-  - Pre-existing, out of scope (flagged as a separate task): `openapi:export` runs through ts-node, which doesn't apply the `@nestjs/swagger` CLI plugin. So every DTO schema is exported without `properties` — auth DTOs included, same as the committed baseline. Paths, operations, responses and security are exported correctly.
+  - Fixed afterwards in this phase, at the user's request to resolve everything in the session. `openapi:export` runs through ts-node, which doesn't apply the `@nestjs/swagger` CLI plugin, so every DTO schema had been exported without `properties` (the baseline too, auth DTOs included).
+    - `src/swagger/generate-metadata.ts` (`npm run openapi:metadata`, chained into `openapi:export`) generates `src/metadata.ts` with the CLI's `PluginMetadataGenerator` + `ReadonlyVisitor`, using the plugin options from `nest-cli.json` (context7 `/nestjs/docs.nestjs.com`, OpenAPI → CLI plugin / SWC recipe). `exportSpec` now loads it like `main.ts` does.
+    - Two CommonJS adaptations are applied to the printed file, both documented in the generator: `import()` → `require()` (under `module: nodenext` tsc keeps dynamic `import()` native, and Node's ESM resolver can't load extensionless paths), and interface fields qualified as `t[...].Object` → `Object`.
+    - `generate-metadata.integration-spec.ts` fails `npm test` when the committed file is stale.
+    - The live `/api/docs-json` of the production build (`SWAGGER_ENABLED=true`) matches the exported `openapi.json` byte for byte (paths and schemas).
+  - `.claude/rules/nestjs-dtos.md` requires `@ApiProperty` on response DTO fields. `src/videos/dto/video-responses.dto.ts` now has it, with formats, examples and the named `VideoStatus` enum. Nullable fields declare `type` explicitly, because `T | null` reflects as `Object`.
+  - The frontend regen with the real shapes stays green: `tsc` 0, lint 0 errors, Vitest 67.
+  - Documentation drift found and corrected:
+    - `next-frontend/CLAUDE.md` and `.claude/rules/next-frontend-bff-api.md` cited a CI workflow (`.github/workflows/openapi-freshness.yml`) that was never committed, and called `next-frontend/openapi.json` committed although it is git-ignored.
+    - `nestjs-project/CLAUDE.md` now documents the `*.module.spec.ts` exception prescribed by the testing guide: compilation tests run against the real services.
   - Docs updated against the code:
     - `nestjs-project/CLAUDE.md`: services and readiness checks; worker commands and `dist-worker`; test infra and `set-test-env.ts`; a Videos section with modules, endpoints, lifecycle, storage layout and env vars.
     - Root `CLAUDE.md`: phase status, containers, the `S3_PUBLIC_ENDPOINT` exception, commands.
@@ -110,8 +119,17 @@
   - Every file path cited in the three documents was checked to exist. `npm run build` emits both `dist/main.js` and `dist/main-worker.js`.
 
 ### Final verification (Definition of Done)
-- `docker compose exec nestjs-api npm test -- --runInBand` → 37 suites, 238 tests passing
+- `docker compose exec nestjs-api npm test -- --runInBand` → 38 suites, 241 tests passing
 - `docker compose exec nestjs-api npm run test:e2e` → 5 suites, 65 tests passing
 - `docker compose exec nestjs-api npx tsc --noEmit` → exit 0
 - `docker compose exec nestjs-api npm run lint` → exit 0 (0 errors; the 28 warnings were there before Phase 03)
 - `docker compose ps` → `db`, `mailpit`, `minio`, `redis` healthy; `nestjs-api` and `video-worker` up; `minio-init` exited 0
+- Real end-to-end run before the PR:
+  - Setup: the API dev server was running, the `video-worker` container consumed the dev queue, and a host-side client talked HTTP to `localhost:3000` and the presigned URLs to `localhost:9000`, with confirmation through Mailpit.
+  - Result: 27/27 checks passed.
+    - Auth: register → confirm → login.
+    - Upload limits: 401 without a token, `VIDEO_TOO_LARGE` above 10 GiB, and exactly 10 GiB accepted as 160 parts of 64 MiB.
+    - Upload and processing: a 137 MB 1080p clip in 3 parts PUT straight to MinIO → complete `202` → the worker set it to `ready` within ~1 s. It extracted 60 s, h264/aac 1920×1080 @ 30 fps, and a thumbnail taken at 6.000 s (10%).
+    - Playback: stream `302` → `206` for byte 0 and for a seek to byte 100,000,000; the download was byte-identical (sha256); thumbnail served as JPEG.
+    - Failure paths: a non-video file → `failed` with the signature redacted; `failed` video and unknown slug → 404; another user → 403.
+  - Test data was removed afterwards.
