@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
-**SIs:** 11/12 completed
+**Status:** completed
+**SIs:** 12/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -96,6 +96,22 @@
   - The slug routes (`/videos/:slug/{stream,download,thumbnail}`) have two segments, so they don't collide with the owner route `GET /videos/:id` (`ParseUUIDPipe`).
 
 ### SI-03.12 — Sincronizar contrato OpenAPI e documentar a fase
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `src/openapi-export.integration-spec.ts` (+3: the 8 video operations are exported; owner endpoints require `access-token` and the 3 playback routes don't; playback documents `302` + `Location` and `404`) — 12 passing
+- **Observations:**
+  - Contract chain run: `openapi:export` → `scripts/sync-openapi.sh` → `openapi:types`. `nestjs-project/openapi.json` and `next-frontend/openapi.json` are byte-identical, and a second `openapi:types` produced no diff in `types.gen.ts` (same md5). Frontend DoD after the regen: `tsc` 0, lint 0 errors, Vitest 67 passing.
+  - `next-frontend/openapi.json` is git-ignored (`next-frontend/.gitignore`). The root `CLAUDE.md` said to commit it; it now says to commit `nestjs-project/openapi.json` + `types.gen.ts`.
+  - Pre-existing, out of scope (flagged as a separate task): `openapi:export` runs through ts-node, which doesn't apply the `@nestjs/swagger` CLI plugin. So every DTO schema is exported without `properties` — auth DTOs included, same as the committed baseline. Paths, operations, responses and security are exported correctly.
+  - Docs updated against the code:
+    - `nestjs-project/CLAUDE.md`: services and readiness checks; worker commands and `dist-worker`; test infra and `set-test-env.ts`; a Videos section with modules, endpoints, lifecycle, storage layout and env vars.
+    - Root `CLAUDE.md`: phase status, containers, the `S3_PUBLIC_ENDPOINT` exception, commands.
+    - `docs/diagrams/software-arch.mermaid`: queue is Redis + BullMQ, storage is MinIO.
+    - `README.md`: architecture, services, Phase 03 endpoints, structure, phase table.
+  - Every file path cited in the three documents was checked to exist. `npm run build` emits both `dist/main.js` and `dist/main-worker.js`.
+
+### Final verification (Definition of Done)
+- `docker compose exec nestjs-api npm test -- --runInBand` → 37 suites, 238 tests passing
+- `docker compose exec nestjs-api npm run test:e2e` → 5 suites, 65 tests passing
+- `docker compose exec nestjs-api npx tsc --noEmit` → exit 0
+- `docker compose exec nestjs-api npm run lint` → exit 0 (0 errors; the 28 warnings were there before Phase 03)
+- `docker compose ps` → `db`, `mailpit`, `minio`, `redis` healthy; `nestjs-api` and `video-worker` up; `minio-init` exited 0

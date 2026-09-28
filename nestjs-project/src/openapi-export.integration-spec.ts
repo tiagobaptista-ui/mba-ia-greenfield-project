@@ -128,4 +128,66 @@ describe('exportSpec (integration)', () => {
       }
     }
   });
+
+  describe('videos (phase 03)', () => {
+    const ownerOperations = [
+      { path: '/videos', method: 'post' },
+      { path: '/videos/{id}/upload/part-urls', method: 'get' },
+      { path: '/videos/{id}/upload/complete', method: 'post' },
+      { path: '/videos/{id}/upload', method: 'delete' },
+      { path: '/videos/{id}', method: 'get' },
+    ];
+    const playbackOperations = [
+      { path: '/videos/{slug}/stream', method: 'get' },
+      { path: '/videos/{slug}/download', method: 'get' },
+      { path: '/videos/{slug}/thumbnail', method: 'get' },
+    ];
+
+    function operationAt(path: string, method: string) {
+      const paths = document.paths as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+      return paths[path]?.[method];
+    }
+
+    it('exports the 8 video endpoints', () => {
+      const paths = document.paths as Record<string, Record<string, unknown>>;
+      const videoOperations = Object.entries(paths)
+        .filter(([p]) => p.startsWith('/videos'))
+        .flatMap(([, methods]) => Object.keys(methods));
+
+      expect(videoOperations).toHaveLength(8);
+      for (const { path, method } of [
+        ...ownerOperations,
+        ...playbackOperations,
+      ]) {
+        expect(operationAt(path, method)).toBeDefined();
+      }
+    });
+
+    it('requires the access token on owner endpoints only', () => {
+      for (const { path, method } of ownerOperations) {
+        const security = operationAt(path, method)?.security as
+          | Array<Record<string, unknown>>
+          | undefined;
+        expect(security?.some((req) => 'access-token' in req)).toBe(true);
+      }
+      for (const { path, method } of playbackOperations) {
+        expect(operationAt(path, method)?.security).toBeUndefined();
+      }
+    });
+
+    it('documents playback as a 302 redirect with a Location header', () => {
+      for (const { path, method } of playbackOperations) {
+        const responses = operationAt(path, method)?.responses as Record<
+          string,
+          Record<string, unknown>
+        >;
+        const headers = responses['302']?.headers as Record<string, unknown>;
+        expect(headers).toHaveProperty('Location');
+        expect(responses).toHaveProperty('404');
+      }
+    });
+  });
 });
