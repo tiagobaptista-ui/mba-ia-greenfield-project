@@ -122,9 +122,9 @@ This project follows a **strict BFF model**: the browser never talks to the Nest
 
 The upstream API publishes an OpenAPI 3.x spec. **Every wire shape in `next-frontend/` — Route Handler requests/responses, MSW fixtures, BFF↔component types — is derived from that spec via generated types.** No DTO is hand-duplicated on the frontend; if a shape isn't in `paths`, it doesn't exist.
 
-Contract chain: `openapi.json` (committed local copy) → `lib/api/types.gen.ts` (generated, do not edit) → `paths` (typed surface) → consumers (BFF + components + MSW).
+Contract chain: `openapi.json` (git-ignored local copy of `nestjs-project/openapi.json`, refreshed by `scripts/sync-openapi.sh`) → `lib/api/types.gen.ts` (generated and committed, do not edit) → `paths` (typed surface) → consumers (BFF + components + MSW).
 
-CI guard: `.github/workflows/openapi-freshness.yml` blocks merging stale spec/types pairs.
+Freshness check (the repo has no CI workflow): after `sync-openapi.sh` + `npm run openapi:types`, `git diff --exit-code lib/api/types.gen.ts` must be clean. On the backend side, `nestjs-project/src/swagger/generate-metadata.integration-spec.ts` fails `npm test` when the Swagger plugin metadata behind `openapi.json` is stale.
 
 Source of decisions: `docs/decisions/technical-decisions-next-frontend-openapi-typing.md` (TD-01…TD-05).
 

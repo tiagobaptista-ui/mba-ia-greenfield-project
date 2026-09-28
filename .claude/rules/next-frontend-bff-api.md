@@ -13,7 +13,7 @@ These rules govern the BFF (Backend-for-Frontend) layer: same-origin Route Handl
 
 | File | Role | Edit by hand? |
 |---|---|---|
-| `next-frontend/openapi.json` | Committed local copy of the upstream OpenAPI spec. Lives here because the next-frontend container only sees its own subproject. | No — refreshed by `scripts/sync-openapi.sh` (repo-root, host-only). |
+| `next-frontend/openapi.json` | Git-ignored local copy of the upstream spec (`nestjs-project/openapi.json`, the committed source of truth). Lives here because the next-frontend container only sees its own subproject. | No — refreshed by `scripts/sync-openapi.sh` (repo-root, host-only). |
 | `next-frontend/lib/api/types.gen.ts` | Generated `paths` interface; emitted by `openapi-typescript` from the local spec copy. | **Never.** Regenerate via `npm run openapi:types`. |
 | `next-frontend/lib/api/upstream.ts` | Server-only typed HTTP client (`openapi-fetch` over `paths`). The **only** module that calls the upstream host. | Yes — sparingly (middleware, base config). |
 | `next-frontend/lib/api/contracts.ts` | BFF↔components barrel. **The only file in the project authorized to import `paths` from `types.gen.ts`** (with the documented `mocks/` exception — see the MSW rule). Feature code consumes named aliases from here. | Yes — feature SIs append aliases as endpoints are wired. |
@@ -23,9 +23,9 @@ These rules govern the BFF (Backend-for-Frontend) layer: same-origin Route Handl
 1. From repo root: `bash scripts/sync-openapi.sh` (host-only — refreshes `next-frontend/openapi.json` from the upstream source).
 2. Inside the next-frontend container: `docker compose exec next-frontend npm run openapi:types` (regenerates `lib/api/types.gen.ts`).
 3. `docker compose exec next-frontend npx tsc --noEmit` — surfaces every consumer that broke against the new contract.
-4. Commit `next-frontend/openapi.json` AND `next-frontend/lib/api/types.gen.ts` **in the same PR**. Both are committed-by-design.
+4. Commit `nestjs-project/openapi.json` AND `next-frontend/lib/api/types.gen.ts` **in the same PR** (`next-frontend/openapi.json` is git-ignored — `next-frontend/.gitignore`).
 
-CI guard: `.github/workflows/openapi-freshness.yml` re-runs steps 1–2 and fails the PR if `git diff --exit-code` shows drift in either file. Merging a stale pair is structurally impossible.
+Freshness check (the repo has no CI workflow): re-running steps 1–2 must leave `git diff --exit-code next-frontend/lib/api/types.gen.ts` clean. Upstream, `nestjs-project/src/swagger/generate-metadata.integration-spec.ts` fails the backend suite when the plugin metadata behind `openapi.json` is stale.
 
 ## Consumption patterns
 

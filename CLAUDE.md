@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 StreamTube — a video sharing platform (YouTube-like). Users can upload, manage, and publish videos. Anonymous users can watch freely; social features (comments, subscriptions, likes) require authentication.
 
-More info in the project overview: [docs/project-plan.md](docs/project-plan.md). Phases 01 (base setup) and 02 (auth, backend + frontend) are done; phases 03–07 (video upload/processing → search) are planned.
+More info in the project overview: [docs/project-plan.md](docs/project-plan.md). Phases 01 (base setup) and 02 (auth, backend + frontend) are done. Phase 03 (video upload/processing/streaming) is done on the backend (the video UI is out of its scope). Phases 04–07 (video management → search) are planned.
 
 ## Repository Structure
 
@@ -23,11 +23,11 @@ Monorepo with two subprojects, each with its **own** `CLAUDE.md` holding the det
 See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
 - **Frontend** (Next.js) → strict **BFF**: the browser only calls same-origin Route Handlers in `app/api/**`, which proxy server-side to the API. Streams media from Object Storage.
-- **API** (Nest.js) → business rules, auth (JWT + refresh-token rotation, global `JwtAuthGuard` with `@Public()` opt-out), reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage *(planned — phase 03)*
+- **API** (Nest.js) → business rules, auth (JWT + refresh-token rotation, global `JwtAuthGuard` with `@Public()` opt-out), reads/writes DB, signs direct-to-storage multipart uploads and playback URLs, publishes jobs to queue, sends emails
+- **Video Worker** (FFmpeg) → `video-worker` container, second entrypoint of the NestJS codebase (`src/main-worker.ts`): consumes `process-video` jobs, extracts duration/metadata with ffprobe, generates the thumbnail, updates DB and storage
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
-- **Object Storage** (S3/MinIO) → video files and thumbnails *(planned)*
-- **Message Queue** (TBD) → video processing job queue *(planned)*
+- **Object Storage** (S3 API; MinIO in dev, console at http://localhost:9001) → private bucket `streamtube-media` with video originals and thumbnails. Clients upload parts and stream (`Range` → `206`) directly against it through presigned URLs
+- **Message Queue** (Redis + BullMQ) → `video-processing` queue with retries and exponential backoff
 - **Email Service** (SMTP; Mailpit in dev, UI at http://localhost:8025) → account confirmation and password recovery
 
 ### OpenAPI contract between subprojects
@@ -35,12 +35,12 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 The backend's OpenAPI spec is the single source of truth for every wire shape on the frontend (BFF handlers, MSW fixtures, component types). When an endpoint or DTO changes, regenerate the chain in this order:
 
 ```bash
-cd nestjs-project && docker compose exec nestjs-api npm run openapi:export   # writes nestjs-project/openapi.json
+cd nestjs-project && docker compose exec nestjs-api npm run openapi:export   # regenerates src/metadata.ts, writes nestjs-project/openapi.json
 bash scripts/sync-openapi.sh                                                  # from repo root, on the HOST
 cd next-frontend && docker compose exec next-frontend npm run openapi:types  # writes lib/api/types.gen.ts
 ```
 
-Commit `nestjs-project/openapi.json`, `next-frontend/openapi.json` and `next-frontend/lib/api/types.gen.ts` together. Never hand-edit `types.gen.ts` or duplicate DTOs on the frontend.
+Commit `nestjs-project/src/metadata.ts`, `nestjs-project/openapi.json` and `next-frontend/lib/api/types.gen.ts` together (`next-frontend/openapi.json` is a git-ignored local copy that feeds the generator). Never hand-edit `types.gen.ts` or duplicate DTOs on the frontend.
 
 ## Docker Networking
 
@@ -50,6 +50,8 @@ Inside a container, `localhost` refers to the container itself, not the host mac
 
 - **Correct:** `DB_HOST=db` (the Compose service name)
 - **Wrong:** `DB_HOST=localhost`
+
+**Exception — presigned storage URLs:** `S3_PUBLIC_ENDPOINT=http://localhost:9000` is not a service-to-service host. It is only the host that URLs handed to clients (upload parts, stream, download) are signed for — SigV4 binds the host, so a URL signed for `minio:9000` is unusable outside the Compose network. Server-side storage calls always use `S3_ENDPOINT=http://minio:9000`.
 
 This applies to all environment variables, configuration files, and code that references service hosts.
 
@@ -61,15 +63,16 @@ All `npm`/`npx`/`tsc` commands run **inside the container** (`docker compose exe
 
 | | Backend (`nestjs-project/`, service `nestjs-api`) | Frontend (`next-frontend/`, service `next-frontend`) |
 |---|---|---|
-| Start env | `docker compose up -d` (API + `db` + `mailpit`) | `docker compose up -d` |
+| Start env | `docker compose up -d` (API + `db` + `mailpit` + `minio` + `redis` + `video-worker`) | `docker compose up -d` |
 | First run | `npm install` then `npm run migration:run` (synchronize is off) | `npm install` |
 | Dev server | `npm run start:dev` (port 3000, run in background) | `npm run dev` (host port 3001, run in background) |
-| All tests | `npm test` (unit + integration) and `npm run test:e2e` | `npm test` (Vitest) and `npx playwright test` on host |
+| Video worker | starts with `docker compose up -d` (`video-worker` runs `npm run start:worker:dev`); logs via `docker compose logs video-worker` | — |
+| All tests | `npm test -- --runInBand` (unit + integration) and `npm run test:e2e` | `npm test` (Vitest) and `npx playwright test` on host |
 | Single test | `npm test -- path/to/file.spec.ts` | `npm test -- path/to/file.test.ts` / `npx playwright test tests/x.e2e-spec.ts` |
 | Type-check | `npx tsc --noEmit` | `npx tsc --noEmit` |
 | Lint | `npm run lint` | `npm run lint` |
 
-"Start the environment" means containers/infra only — start the dev servers only when explicitly asked. Backend integration/e2e suites share one DB and must run `--runInBand`. Playwright requires the frontend dev server started with `MSW_ENABLED=true` (details in `next-frontend/CLAUDE.md`).
+"Start the environment" means containers/infra only (the `video-worker` container included) — start the HTTP dev servers only when explicitly asked. Backend integration/e2e suites share one DB and must run `--runInBand`. Playwright requires the frontend dev server started with `MSW_ENABLED=true` (details in `next-frontend/CLAUDE.md`).
 
 ## Planning Workflow (docs/)
 
