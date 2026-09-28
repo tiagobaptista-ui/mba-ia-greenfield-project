@@ -34,6 +34,7 @@ import {
   SLUG_MAX_RETRIES,
 } from './videos.constants';
 import type {
+  ProcessedVideoResult,
   SignedPartUrls,
   UploadedPartInput,
   VideoDetails,
@@ -208,6 +209,39 @@ export class VideosService {
     const uploadId = assertUploadInProgress(video);
     await this.storageService.abortMultipartUpload(video.storage_key, uploadId);
     await this.videoRepository.delete(video.id);
+  }
+
+  /** Worker lookup: `null` means the job refers to a video that no longer exists. */
+  async findForProcessing(videoId: string): Promise<Video | null> {
+    return this.videoRepository.findOneBy({ id: videoId });
+  }
+
+  /**
+   * `processing → ready`. Guarded by the current status so a duplicate or late job can
+   * never overwrite a video that already left `processing` (TD-10).
+   */
+  async markProcessed(
+    videoId: string,
+    result: ProcessedVideoResult,
+  ): Promise<void> {
+    await this.videoRepository.update(
+      { id: videoId, status: VideoStatus.PROCESSING },
+      {
+        status: VideoStatus.READY,
+        duration_seconds: result.duration_seconds,
+        metadata: result.metadata,
+        thumbnail_key: result.thumbnail_key,
+        processing_error: null,
+      },
+    );
+  }
+
+  /** `processing → failed` with the reason truncated to the column size (TD-10). */
+  async markFailed(videoId: string, reason: string): Promise<void> {
+    await this.videoRepository.update(
+      { id: videoId, status: VideoStatus.PROCESSING },
+      { status: VideoStatus.FAILED, processing_error: truncate(reason) },
+    );
   }
 
   private async insertDraftWithUniqueSlug(

@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 8/12 completed
+**SIs:** 9/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -70,9 +70,13 @@
   - `src/test/video-fixture.ts` generates the clip with `lavfi` `testsrc` + `sine` (libx264/aac) in a temp dir — no binary fixture committed.
 
 ### SI-03.9 — Implementar VideoProcessor (processamento em segundo plano)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 15 new passing — `src/worker/video.processor.spec.ts` (8: happy path → thumbnail `thumbnails/{id}.jpg` + `markProcessed`; `ready`/`failed`/`draft` skipped; missing video skipped; invalid media → `markFailed` + `UnrecoverableError`; transient failure on attempt 1/3 rethrown without `markFailed`; failure on attempt 3/3 → `markFailed`), `src/worker/video.processor.integration-spec.ts` (3 — real DB + MinIO + FFmpeg: generated clip → `ready` with duration ≈ 3 s, h264 320×240 @ 25 fps and the thumbnail object in MinIO; text file → `failed` on the first attempt via `UnrecoverableError`; reprocessing a `ready` video is a no-op), `src/videos/videos.service.integration-spec.ts` (+4: `markProcessed`, `markFailed` truncated to 500, status guard on a video that already left `processing`, `findForProcessing` → null); `src/worker` + `src/media` + `src/videos`: 64 passing
+- **Observations:**
+  - `markProcessed`/`markFailed` update `WHERE id = :id AND status = 'processing'`, so a duplicate or late job can never overwrite a `ready`/`failed` video (idempotency required by TD-10).
+  - The processor issues a `HeadObject` on the original before probing: an unreachable storage or a missing object then fails as a transient storage error (retried with backoff) instead of being misread by ffprobe as invalid media and failed without retries.
+  - Found while testing: ffprobe/ffmpeg echo the input in stderr, so the error for a presigned URL carried a live `X-Amz-Signature` into logs and `processing_error` (visible to the owner). `FfmpegService` now redacts the input as `<input>`; the integration test asserts it.
+  - `VideoProcessor` is not registered in `AppModule` (the API never consumes jobs, TD-06); it is wired by the worker entrypoint in SI-03.10.
 
 ### SI-03.10 — Criar entrypoint do worker e serviço video-worker no Compose
 - **Status:** pending

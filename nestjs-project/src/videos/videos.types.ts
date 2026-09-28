@@ -31,3 +31,10 @@ export interface UploadedPartInput {
   part_number: number;
   etag: string;
 }
+
+/** What the worker extracted from the original (TD-07). */
+export interface ProcessedVideoResult {
+  duration_seconds: number;
+  metadata: VideoMetadata;
+  thumbnail_key: string;
+}

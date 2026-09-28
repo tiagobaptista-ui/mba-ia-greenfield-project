@@ -37,7 +37,7 @@ export class FfmpegService {
     );
     if (result.code !== 0) {
       throw new InvalidMediaError(
-        `ffprobe could not read the input: ${lastLine(result.stderr)}`,
+        `ffprobe could not read the input: ${lastLine(result.stderr, input)}`,
       );
     }
     let parsed: FfprobeOutput;
@@ -72,7 +72,7 @@ export class FfmpegService {
     );
     if (result.code !== 0) {
       throw new Error(
-        `ffmpeg failed to extract a frame: ${lastLine(result.stderr)}`,
+        `ffmpeg failed to extract a frame: ${lastLine(result.stderr, input)}`,
       );
     }
   }
@@ -130,8 +130,10 @@ function toNumber(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function lastLine(text: string): string {
-  const lines = text.trim().split('\n');
+// FFmpeg prefixes errors with the input; a presigned URL carries a live signature, so it
+// is redacted before the message can reach logs or `processing_error`.
+function lastLine(text: string, input: string): string {
+  const lines = text.split(input).join('<input>').trim().split('\n');
   return lines[lines.length - 1] || 'unknown error';
 }
 

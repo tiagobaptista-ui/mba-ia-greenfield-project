@@ -3,7 +3,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { DataSource, Repository } from 'typeorm';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { VerificationToken } from '../auth/entities/verification-token.entity';
@@ -13,6 +13,10 @@ import storageConfig from '../config/storage.config';
 import { UploadSizeMismatchException } from '../common/exceptions/domain.exception';
 import { VIDEO_PROCESSING_QUEUE } from '../queue/queue.constants';
 import { obliterateQueue } from '../test/queue';
+import {
+  videoOriginalKey,
+  videoThumbnailKey,
+} from '../storage/storage.constants';
 import { StorageService } from '../storage/storage.service';
 import {
   cleanAllTables,
@@ -21,6 +25,7 @@ import {
 import { deleteObjectsByPrefix, putToPresignedUrl } from '../test/storage';
 import { User } from '../users/entities/user.entity';
 import { Video, VideoStatus } from './entities/video.entity';
+import { generateVideoSlug } from './slug.util';
 import { VideosModule } from './videos.module';
 import { VideosService } from './videos.service';
 
@@ -223,6 +228,77 @@ describe('VideosService (integration — real DB + MinIO)', () => {
         body: randomBytes(1024),
       });
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('worker lifecycle', () => {
+    async function insertVideo(status: VideoStatus): Promise<Video> {
+      const id = randomUUID();
+      return videoRepository.save({
+        id,
+        channel_id: ownerChannelId,
+        slug: generateVideoSlug(),
+        title: 'clip',
+        status,
+        original_file_name: 'clip.mp4',
+        content_type: 'video/mp4',
+        size_bytes: 4096,
+        storage_key: videoOriginalKey(id),
+        part_size_bytes: 4096,
+        part_count: 1,
+      });
+    }
+
+    const processed = {
+      duration_seconds: 3.02,
+      metadata: {
+        container: 'mov,mp4,m4a,3gp,3g2,mj2',
+        video_codec: 'h264',
+        audio_codec: 'aac',
+        width: 320,
+        height: 240,
+        fps: 25,
+        bitrate: 180000,
+      },
+    };
+
+    it('should persist processing → ready with duration, metadata and thumbnail key', async () => {
+      const video = await insertVideo(VideoStatus.PROCESSING);
+
+      await videosService.markProcessed(video.id, {
+        ...processed,
+        thumbnail_key: videoThumbnailKey(video.id),
+      });
+
+      const stored = await videoRepository.findOneByOrFail({ id: video.id });
+      expect(stored.status).toBe(VideoStatus.READY);
+      expect(stored.duration_seconds).toBe(3.02);
+      expect(stored.metadata).toEqual(processed.metadata);
+      expect(stored.thumbnail_key).toBe(`thumbnails/${video.id}.jpg`);
+    });
+
+    it('should persist processing → failed with the reason truncated to 500 chars', async () => {
+      const video = await insertVideo(VideoStatus.PROCESSING);
+
+      await videosService.markFailed(video.id, 'x'.repeat(800));
+
+      const stored = await videoRepository.findOneByOrFail({ id: video.id });
+      expect(stored.status).toBe(VideoStatus.FAILED);
+      expect(stored.processing_error).toHaveLength(500);
+    });
+
+    it('should not touch a video that already left processing', async () => {
+      const video = await insertVideo(VideoStatus.READY);
+
+      await videosService.markFailed(video.id, 'late duplicate job');
+
+      const stored = await videoRepository.findOneByOrFail({ id: video.id });
+      expect(stored.status).toBe(VideoStatus.READY);
+      expect(stored.processing_error).toBeNull();
+    });
+
+    it('should return null from findForProcessing for an unknown id', async () => {
+      expect(await videosService.findForProcessing(randomUUID())).toBeNull();
     });
   });
 });
