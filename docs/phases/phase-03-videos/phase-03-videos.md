@@ -209,7 +209,7 @@ Entregar no `nestjs-project` o upload de vídeos de até 10GB sem impacto na per
 ### SI-03.7 — Expor endpoints de upload (VideosController + VideosModule)
 
 **Route:** POST /videos, GET /videos/:id/upload/part-urls, POST /videos/:id/upload/complete, DELETE /videos/:id/upload, GET /videos/:id
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload.plan.md`
 **Authorization:** Authenticated (criar) / Owner (demais) — per `### Authorization Matrix`
 
 **Description:** Publica o protocolo de upload via HTTP conforme o `### API Contracts`, com autenticação, limites de throttling e documentação OpenAPI, e liga o módulo de vídeos na aplicação.
@@ -331,7 +331,7 @@ Entregar no `nestjs-project` o upload de vídeos de até 10GB sem impacto na per
 ### SI-03.11 — Expor streaming, download e thumbnail (endpoints públicos)
 
 **Route:** GET /videos/:slug/stream, GET /videos/:slug/download, GET /videos/:slug/thumbnail
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-playback.plan.md`
 **Authorization:** Anonymous (somente vídeos `ready`) — per `### Authorization Matrix`
 
 **Description:** Entrega a reprodução sem download completo e o download do vídeo pela URL única, redirecionando para o storage, que atende `Range` com `206`.
