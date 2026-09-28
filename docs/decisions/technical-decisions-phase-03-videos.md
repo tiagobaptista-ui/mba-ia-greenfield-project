@@ -1,7 +1,7 @@
 ---
 scope_type: phase
 related_phases: [3]
-status: pending
+status: decided
 date: 2026-09-28
 scope_description: "Backend foundation for video upload and processing: background queue technology, local S3-compatible storage server, storage layout and access model, large-file (≤10GB) upload protocol, upload-completion trigger, worker runtime, FFmpeg integration for metadata/thumbnail, unique video URL identifier, streaming/download delivery, video status lifecycle and failure handling, Phase 03 access policy, and the testing strategy for storage/queue/worker."
 ---
@@ -46,7 +46,9 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A (BullMQ + Redis)** — it is the only option that gives retries-with-backoff and job de-duplication out of the box with an official Nest integration that is CommonJS-compatible with the installed Nest 11.1.16; RabbitMQ would force a Nest upgrade and a hand-built retry/DLX layer for a single job type, and pg-boss is ESM-only and loads the primary DB. Pin `@nestjs/bullmq@^11.0` + `bullmq@^5`.
 
-**Decision:** _[pending]_
+**Decision:** A (BullMQ + Redis via `@nestjs/bullmq`)
+
+**Libraries:** @nestjs/bullmq, bullmq
 
 ---
 
@@ -77,7 +79,9 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A (Chainguard MinIO, pinned by digest)** — it keeps the assignment's MinIO with the exact S3 semantics the upload/stream design relies on, without owning a Go build; because the application talks only S3 (endpoint + credentials from env), swapping to AWS S3 in production or to another S3 server later is a configuration change, not a code change.
 
-**Decision:** _[pending]_
+**Decision:** A (MinIO via Chainguard image `cgr.dev/chainguard/minio`, pinned by digest)
+
+**Libraries:** minio
 
 ---
 
@@ -108,7 +112,9 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — a single private bucket with id-derived keys plus presigned access keeps drafts and future unlisted videos protected, needs one bootstrap step, and the internal/public endpoint split is the minimum needed for presigned URLs to work both inside Compose and from the host.
 
-**Decision:** _[pending]_
+**Decision:** A (single private bucket, id-derived keys, presigned-only access, internal/public S3 endpoints)
+
+**Libraries:** @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 
 ---
 
@@ -139,7 +145,12 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A (S3 multipart + presigned part URLs)** — it is the only option where the 10GB never touches the API and each part is independently retryable, using a native S3 feature that works identically on MinIO and AWS; part size ~64 MiB keeps a 10 GiB file at ~160 parts (well under 10,000), `size_bytes ≤ 10 GiB` is validated at init, and part URLs are signed in batches so the handshake stays within the global throttler.
 
-**Decision:** _[pending]_
+**Decision:** A (S3 multipart upload with presigned part URLs)
+
+**Libraries:** @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
+
+**Revisions:**
+- 2026-09-28 — Pre-registration request fixed: required `file_name`, `size_bytes`, `content_type`; optional `title` (1–100 chars) defaulting to the file name without extension (editable in Phase 04). Rationale: resolves AMB-2 in `/plan-resolve` (user choice: title optional, derived from file name).
 
 ---
 
@@ -165,7 +176,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A (explicit complete endpoint)** — S3 multipart always needs a `CompleteMultipartUpload` call, so doing it in the API gives one authorized, testable transition (`draft → processing` + enqueue with `jobId = videoId`) that behaves the same on MinIO and AWS.
 
-**Decision:** _[pending]_
+**Decision:** A (explicit complete endpoint + enqueue with `jobId = videoId`)
 
 ---
 
@@ -196,7 +207,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — a second entrypoint in the same codebase delivers the separate worker container the architecture requires while reusing the existing config, entities and storage code instead of duplicating them.
 
-**Decision:** _[pending]_
+**Decision:** A (same codebase, second entrypoint, own `video-worker` Compose service)
 
 ---
 
@@ -227,7 +238,12 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — spawning the OS-packaged `ffprobe`/`ffmpeg` avoids a deprecated wrapper and install-time binary downloads, and reading through a presigned URL lets FFmpeg seek within a 10GB file without a local copy; the thumbnail frame is taken at ~10% of the duration (bounded to the first minute) to avoid black intro frames.
 
-**Decision:** _[pending]_
+**Decision:** A (spawn OS-packaged `ffprobe`/`ffmpeg` over a presigned GET URL)
+
+**Libraries:** ffmpeg
+
+**Revisions:**
+- 2026-09-28 — Persisted metadata fixed: `duration_seconds` as a dedicated column plus a `metadata` jsonb with normalized fields (container/format, video codec, audio codec, width, height, fps, bitrate). Rationale: resolves AMB-1 in `/plan-resolve` (user choice: duration column + normalized metadata JSON).
 
 ---
 
@@ -258,7 +274,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — a crypto-random base62 slug with a unique index is short, non-enumerable (important once Phase 04 adds unlisted videos) and dependency-free, and its collision handling reuses the retry pattern the project already has for channel nicknames.
 
-**Decision:** _[pending]_
+**Decision:** A (11-char base62 slug from `node:crypto` + unique index + retry)
 
 ---
 
@@ -289,7 +305,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — progressive playback with HTTP `Range` straight from storage satisfies "sem necessidade de download completo" with no transcoding, keeps video bytes off the API as the C4 diagram prescribes, and gives download a forced-attachment variant of the same mechanism.
 
-**Decision:** _[pending]_
+**Decision:** A (API 302 to presigned GET; `Range`/`206` served by storage; attachment variant for download)
 
 ---
 
@@ -320,7 +336,10 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — a single `draft → processing → ready | failed` status matches the lifecycle the phase describes, bounded retries with backoff (native in TD-01's BullMQ) absorb transient errors, and keeping publication out of this column leaves Phase 04's draft→published flow free to be modeled on its own.
 
-**Decision:** _[pending]_
+**Decision:** A (single status `draft → processing → ready | failed`, 3 attempts + exponential backoff)
+
+**Revisions:**
+- 2026-09-28 — Status semantics fixed: this `status` covers only the technical upload/processing lifecycle; editorial publication/visibility (Phase 04 "rascunho → publicação") is a separate attribute to be added by Phase 04, so a `ready` video is not "published". Rationale: resolves AMB-3 in `/plan-resolve` (user choice: separate concepts).
 
 ---
 
@@ -351,7 +370,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — it aligns with the platform's anonymous-viewing principle, protects everything that is not `ready`, and relies on TD-08's non-enumerable slug as the "unlisted-by-link" boundary until Phase 04 introduces visibility.
 
-**Decision:** _[pending]_
+**Decision:** A (owner-only upload control; public playback of `ready` videos by slug; dedicated throttle limits)
 
 ---
 
@@ -382,7 +401,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — the phase's risk lives in presigned multipart, `Range` delivery, retries and FFmpeg, which only real MinIO/Redis/FFmpeg can prove; an isolated queue prefix plus an in-process processor keeps the e2e deterministic. This overrides the testing guide's filesystem-adapter suggestion for this phase.
 
-**Decision:** _[pending]_
+**Decision:** A (real MinIO + Redis + FFmpeg in integration/e2e; isolated test queue prefix)
 
 ---
 
@@ -413,7 +432,7 @@ _Subprojects in scope:_
 
 **Recommendation:** **Option A** — a declared allowlist gives immediate feedback without touching the bytes, the `HeadObject` check at complete makes the 10 GiB cap enforceable despite client-declared sizes, and `ffprobe` in the worker (already required by TD-07) is the single authority on "is this really a video", avoiding a second, weaker format detector in the API.
 
-**Decision:** _[pending]_
+**Decision:** A (MIME/extension allowlist at init + real size check at complete + `ffprobe` authority in worker)
 
 ---
 
@@ -421,16 +440,16 @@ _Subprojects in scope:_
 
 | ID | Scope | Decision | Recommendation | Choice |
 |----|-------|----------|---------------|--------|
-| TD-01 | Backend | Background queue technology | A — BullMQ + Redis (`@nestjs/bullmq@^11`) | _[pending]_ |
-| TD-02 | Repo-wide | Local S3-compatible storage server image | A — Chainguard MinIO pinned by digest | _[pending]_ |
-| TD-03 | Backend | Storage layout and access model | A — single private bucket, id-derived keys, presigned only, internal/public endpoints | _[pending]_ |
-| TD-04 | Backend | Large-file upload protocol (≤10GB, resumable) | A — S3 multipart with presigned part URLs | _[pending]_ |
-| TD-05 | Backend | Upload completion and processing trigger | A — explicit complete endpoint + enqueue with `jobId = videoId` | _[pending]_ |
-| TD-06 | Backend | Video worker runtime and deployment | A — same codebase, second entrypoint, own Compose service | _[pending]_ |
-| TD-07 | Backend | FFmpeg integration for metadata and thumbnail | A — spawn OS-packaged ffprobe/ffmpeg over presigned URL | _[pending]_ |
-| TD-08 | Backend | Unique video URL identifier | A — 11-char base62 slug (`node:crypto`) + unique index + retry | _[pending]_ |
-| TD-09 | Backend | Streaming and download delivery | A — API 302 to presigned GET (`Range`/`206` from storage; attachment for download) | _[pending]_ |
-| TD-10 | Backend | Video status lifecycle and failure handling | A — `draft → processing → ready \| failed`, 3 attempts + backoff | _[pending]_ |
-| TD-11 | Backend | Access policy for video endpoints in Phase 03 | A — owner-only upload control; public playback of `ready` videos by slug | _[pending]_ |
-| TD-12 | Backend | Testing strategy for storage, queue and worker | A — real MinIO/Redis/FFmpeg, isolated test queue prefix | _[pending]_ |
-| TD-13 | Backend | Accepted formats and upload validation policy | A — MIME/extension allowlist at init, real size check at complete, `ffprobe` authority in worker | _[pending]_ |
+| TD-01 | Backend | Background queue technology | A — BullMQ + Redis (`@nestjs/bullmq@^11`) | **A** |
+| TD-02 | Repo-wide | Local S3-compatible storage server image | A — Chainguard MinIO pinned by digest | **A** |
+| TD-03 | Backend | Storage layout and access model | A — single private bucket, id-derived keys, presigned only, internal/public endpoints | **A** |
+| TD-04 | Backend | Large-file upload protocol (≤10GB, resumable) | A — S3 multipart with presigned part URLs | **A** |
+| TD-05 | Backend | Upload completion and processing trigger | A — explicit complete endpoint + enqueue with `jobId = videoId` | **A** |
+| TD-06 | Backend | Video worker runtime and deployment | A — same codebase, second entrypoint, own Compose service | **A** |
+| TD-07 | Backend | FFmpeg integration for metadata and thumbnail | A — spawn OS-packaged ffprobe/ffmpeg over presigned URL | **A** |
+| TD-08 | Backend | Unique video URL identifier | A — 11-char base62 slug (`node:crypto`) + unique index + retry | **A** |
+| TD-09 | Backend | Streaming and download delivery | A — API 302 to presigned GET (`Range`/`206` from storage; attachment for download) | **A** |
+| TD-10 | Backend | Video status lifecycle and failure handling | A — `draft → processing → ready \| failed`, 3 attempts + backoff | **A** |
+| TD-11 | Backend | Access policy for video endpoints in Phase 03 | A — owner-only upload control; public playback of `ready` videos by slug | **A** |
+| TD-12 | Backend | Testing strategy for storage, queue and worker | A — real MinIO/Redis/FFmpeg, isolated test queue prefix | **A** |
+| TD-13 | Backend | Accepted formats and upload validation policy | A — MIME/extension allowlist at init, real size check at complete, `ffprobe` authority in worker | **A** |

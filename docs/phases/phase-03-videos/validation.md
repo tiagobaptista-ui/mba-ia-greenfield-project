@@ -2,63 +2,79 @@
 kind: phase
 name: phase-03-videos
 status: dirty
-issue_count: 16
+issue_count: 0
 sources_mtime:
   docs/phases/phase-03-videos/context.md: "2026-09-28T13:42:07-03:00"
   docs/decisions/technical-decisions-phase-03-videos.md: "2026-09-28T13:40:38-03:00"
 issues:
   - id: AMB-1
-    status: open
+    status: resolved
     summary: "'metadados' não define quais campos técnicos são extraídos e persistidos"
+    resolved_by: phase-03-videos/TD-07
   - id: AMB-2
-    status: open
+    status: resolved
     summary: "Pré-cadastro não define quais dados o cliente informa ao iniciar o upload"
+    resolved_by: phase-03-videos/TD-04
   - id: AMB-3
-    status: open
+    status: resolved
     summary: "'rascunho' da Fase 03 pode colidir com 'rascunho → publicação' da Fase 04"
+    resolved_by: phase-03-videos/TD-10
   - id: MD-1
     status: resolved
     summary: "Sem TD para política de formatos aceitos e validação do arquivo enviado"
     resolved_by: phase-03-videos/TD-13
   - id: OQ-1
-    status: open
+    status: resolved
     summary: "TD-01 pending — Background Queue Technology"
+    resolved_by: phase-03-videos/TD-01
   - id: OQ-2
-    status: open
+    status: resolved
     summary: "TD-02 pending — Local S3-Compatible Storage Server (Compose image)"
+    resolved_by: phase-03-videos/TD-02
   - id: OQ-3
-    status: open
+    status: resolved
     summary: "TD-03 pending — Storage Layout and Access Model"
+    resolved_by: phase-03-videos/TD-03
   - id: OQ-4
-    status: open
+    status: resolved
     summary: "TD-04 pending — Large-File Upload Protocol (≤ 10GB, resumable)"
+    resolved_by: phase-03-videos/TD-04
   - id: OQ-5
-    status: open
+    status: resolved
     summary: "TD-05 pending — Upload Completion and Processing Trigger"
+    resolved_by: phase-03-videos/TD-05
   - id: OQ-6
-    status: open
+    status: resolved
     summary: "TD-06 pending — Video Worker Runtime and Deployment"
+    resolved_by: phase-03-videos/TD-06
   - id: OQ-7
-    status: open
+    status: resolved
     summary: "TD-07 pending — FFmpeg Integration for Metadata and Thumbnail"
+    resolved_by: phase-03-videos/TD-07
   - id: OQ-8
-    status: open
+    status: resolved
     summary: "TD-08 pending — Unique Video URL Identifier"
+    resolved_by: phase-03-videos/TD-08
   - id: OQ-9
-    status: open
+    status: resolved
     summary: "TD-09 pending — Streaming and Download Delivery"
+    resolved_by: phase-03-videos/TD-09
   - id: OQ-10
-    status: open
+    status: resolved
     summary: "TD-10 pending — Video Status Lifecycle and Processing Failure Handling"
+    resolved_by: phase-03-videos/TD-10
   - id: OQ-11
-    status: open
+    status: resolved
     summary: "TD-11 pending — Access Policy for Video Endpoints in Phase 03"
+    resolved_by: phase-03-videos/TD-11
   - id: OQ-12
-    status: open
+    status: resolved
     summary: "TD-12 pending — Testing Strategy for Storage, Queue and Worker"
+    resolved_by: phase-03-videos/TD-12
   - id: OQ-13
-    status: open
+    status: resolved
     summary: "TD-13 pending — Accepted Formats and Upload Validation Policy"
+    resolved_by: phase-03-videos/TD-13
 advisories: []
 ---
 
@@ -72,9 +88,7 @@ _None._
 
 ### Ambiguities
 
-- **AMB-1** — A capability "Processamento automático do vídeo após upload (extração de duração e metadados)" nomeia apenas "duração"; o conjunto de "metadados" (ex.: container/formato, codecs de vídeo e áudio, resolução, fps, bitrate, tamanho) não está definido, e o implementador precisaria perguntar quais campos persistir e em que forma (colunas dedicadas vs. um campo `metadata` estruturado). Explicit choice: definir a lista de metadados extraídos e a forma de persistência (resolver via `/plan-resolve phase-03-videos`; alimenta o Data Model do plano).
-- **AMB-2** — A capability "Pré-cadastro automático do vídeo como rascunho ao iniciar o upload" não diz quais dados o cliente fornece ao iniciar o upload: o título é obrigatório no início ou derivado do nome do arquivo (editável na Fase 04 — "Edição das informações do vídeo: título, descrição, categoria")? Quais atributos do arquivo (nome, tamanho, tipo) são obrigatórios no pré-cadastro? Explicit choice: fixar os campos de entrada do pré-cadastro e a regra de título padrão (resolver via `/plan-resolve phase-03-videos`; alimenta API Contracts e Validation Rules).
-- **AMB-3** — Fronteira com a Fase 04: esta fase cria o vídeo "como rascunho", e o vizinho Phase 04 traz "Fluxo de rascunho → publicação". Não está explícito se o "rascunho" da Fase 03 é o estado de upload/processamento (o vídeo ainda não está pronto) ou o estado editorial que a Fase 04 publica — o mesmo termo pode cair em qualquer lado da fronteira. Explicit choice: declarar que o status da Fase 03 cobre só o ciclo técnico (upload/processamento) e que publicação/visibilidade é um atributo separado da Fase 04 — ou o contrário (resolver junto com OQ-10 / TD-10 via `/plan-resolve phase-03-videos`).
+_None._
 
 ### Missing Decisions
 
@@ -90,19 +104,7 @@ _None._
 
 ### Unresolved Open Questions
 
-- **OQ-1** — TD-01 pending — Background Queue Technology. Resolution: fill the **Decision:** field of TD-01 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-2** — TD-02 pending — Local S3-Compatible Storage Server (Compose image). Resolution: fill the **Decision:** field of TD-02 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-3** — TD-03 pending — Storage Layout and Access Model. Resolution: fill the **Decision:** field of TD-03 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-4** — TD-04 pending — Large-File Upload Protocol (≤ 10GB, resumable). Resolution: fill the **Decision:** field of TD-04 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-5** — TD-05 pending — Upload Completion and Processing Trigger. Resolution: fill the **Decision:** field of TD-05 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-6** — TD-06 pending — Video Worker Runtime and Deployment. Resolution: fill the **Decision:** field of TD-06 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-7** — TD-07 pending — FFmpeg Integration for Metadata and Thumbnail. Resolution: fill the **Decision:** field of TD-07 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-8** — TD-08 pending — Unique Video URL Identifier. Resolution: fill the **Decision:** field of TD-08 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-9** — TD-09 pending — Streaming and Download Delivery. Resolution: fill the **Decision:** field of TD-09 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-10** — TD-10 pending — Video Status Lifecycle and Processing Failure Handling. Resolution: fill the **Decision:** field of TD-10 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-11** — TD-11 pending — Access Policy for Video Endpoints in Phase 03. Resolution: fill the **Decision:** field of TD-11 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-12** — TD-12 pending — Testing Strategy for Storage, Queue and Worker. Resolution: fill the **Decision:** field of TD-12 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
-- **OQ-13** — TD-13 pending — Accepted Formats and Upload Validation Policy. Resolution: fill the **Decision:** field of TD-13 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
+_None._
 
 ### UI Coverage Gaps
 
@@ -111,3 +113,19 @@ _None._ _(UI↔API sync deferred — `## UI Inventory` carries the deferred plac
 ## Resolved Issues
 
 - **MD-1** _(resolved_by phase-03-videos/TD-13)_ — Sem TD para política de formatos aceitos e validação do arquivo enviado. Coberto pela TD-13 adicionada via `/research` (iteração validate → research → context → validate).
+- **AMB-1** _(resolved_by phase-03-videos/TD-07)_ — 'metadados' não define quais campos técnicos são extraídos e persistidos. Usuário escolheu: `duration_seconds` como coluna + `metadata` jsonb normalizado (container/formato, codec de vídeo, codec de áudio, largura, altura, fps, bitrate); registrado como `**Revisions:**` da TD-07.
+- **AMB-2** _(resolved_by phase-03-videos/TD-04)_ — Pré-cadastro não define quais dados o cliente informa ao iniciar o upload. Usuário escolheu: obrigatórios `file_name`, `size_bytes`, `content_type`; `title` opcional (1–100) com padrão = nome do arquivo sem extensão; registrado como `**Revisions:**` da TD-04.
+- **AMB-3** _(resolved_by phase-03-videos/TD-10)_ — 'rascunho' da Fase 03 pode colidir com 'rascunho → publicação' da Fase 04. Usuário escolheu: conceitos separados — o `status` da Fase 03 é só o ciclo técnico; publicação/visibilidade é atributo da Fase 04; registrado como `**Revisions:**` da TD-10.
+- **OQ-1** _(resolved_by phase-03-videos/TD-01)_ — TD-01 decidida: **A** (BullMQ + Redis via `@nestjs/bullmq`).
+- **OQ-2** _(resolved_by phase-03-videos/TD-02)_ — TD-02 decidida: **A** (MinIO via imagem Chainguard, fixada por digest).
+- **OQ-3** _(resolved_by phase-03-videos/TD-03)_ — TD-03 decidida: **A** (bucket privado único, chaves derivadas do id, acesso só por URL pré-assinada, endpoints interno/público).
+- **OQ-4** _(resolved_by phase-03-videos/TD-04)_ — TD-04 decidida: **A** (S3 multipart com URLs pré-assinadas por parte).
+- **OQ-5** _(resolved_by phase-03-videos/TD-05)_ — TD-05 decidida: **A** (endpoint explícito de complete + enfileiramento com `jobId = videoId`).
+- **OQ-6** _(resolved_by phase-03-videos/TD-06)_ — TD-06 decidida: **A** (mesmo codebase, segundo entrypoint, serviço `video-worker` no Compose).
+- **OQ-7** _(resolved_by phase-03-videos/TD-07)_ — TD-07 decidida: **A** (`ffprobe`/`ffmpeg` do SO via `spawn`, lendo por URL pré-assinada).
+- **OQ-8** _(resolved_by phase-03-videos/TD-08)_ — TD-08 decidida: **A** (slug base62 de 11 caracteres via `node:crypto` + índice único + retry).
+- **OQ-9** _(resolved_by phase-03-videos/TD-09)_ — TD-09 decidida: **A** (API responde 302 para GET pré-assinado; `Range`/`206` servidos pelo storage; variante attachment para download).
+- **OQ-10** _(resolved_by phase-03-videos/TD-10)_ — TD-10 decidida: **A** (status único `draft → processing → ready | failed`, 3 tentativas com backoff exponencial).
+- **OQ-11** _(resolved_by phase-03-videos/TD-11)_ — TD-11 decidida: **A** (controle de upload só do dono; reprodução pública de vídeos `ready` por slug; limites de throttle dedicados).
+- **OQ-12** _(resolved_by phase-03-videos/TD-12)_ — TD-12 decidida: **A** (MinIO + Redis + FFmpeg reais em integração/e2e; prefixo de fila isolado para testes).
+- **OQ-13** _(resolved_by phase-03-videos/TD-13)_ — TD-13 decidida: **A** (allowlist de MIME/extensão no início + checagem real de tamanho no complete + `ffprobe` como autoridade no worker).
