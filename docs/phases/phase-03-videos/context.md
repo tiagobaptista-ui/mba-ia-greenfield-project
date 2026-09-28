@@ -3,7 +3,7 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-24T17:34:09-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-09-28T13:06:59-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-09-28T13:40:38-03:00"
   docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-09-24T17:34:09-03:00"
   docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-09-24T17:34:09-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-24T17:34:09-03:00"
@@ -58,6 +58,7 @@ sources_mtime:
 | phase-03-videos/TD-10 | phase | Backend | Video Status Lifecycle and Processing Failure Handling | pending | — | — |
 | phase-03-videos/TD-11 | phase | Backend | Access Policy for Video Endpoints in Phase 03 | pending | — | — |
 | phase-03-videos/TD-12 | phase | Backend | Testing Strategy for Storage, Queue and Worker | pending | — | — |
+| phase-03-videos/TD-13 | phase | Backend | Accepted Formats and Upload Validation Policy | pending | — | — |
 
 _Source files:_
 
@@ -69,7 +70,7 @@ _Source files:_
 |-----------------------------------|------------|
 | Serviço de armazenamento de arquivos (vídeos e thumbnails) | phase-03-videos/TD-02, phase-03-videos/TD-03, phase-03-videos/TD-12 |
 | Serviço de processamento em segundo plano (filas) | phase-03-videos/TD-01, phase-03-videos/TD-06, phase-03-videos/TD-12 |
-| Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | phase-03-videos/TD-04, phase-03-videos/TD-11 |
+| Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | phase-03-videos/TD-04, phase-03-videos/TD-11, phase-03-videos/TD-13 |
 | Pré-cadastro automático do vídeo como rascunho ao iniciar o upload | phase-03-videos/TD-04, phase-03-videos/TD-10 |
 | Processamento automático do vídeo após upload (extração de duração e metadados) | phase-03-videos/TD-05, phase-03-videos/TD-07, phase-03-videos/TD-10, phase-03-videos/TD-12 |
 | Geração automática de thumbnail a partir de um frame do vídeo | phase-03-videos/TD-07, phase-03-videos/TD-12 |

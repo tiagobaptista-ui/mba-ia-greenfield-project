@@ -4,8 +4,8 @@ name: phase-03-videos
 status: dirty
 issue_count: 16
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-09-28T13:25:32-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-09-28T13:06:59-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-09-28T13:42:07-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-09-28T13:40:38-03:00"
 issues:
   - id: AMB-1
     status: open
@@ -17,8 +17,9 @@ issues:
     status: open
     summary: "'rascunho' da Fase 03 pode colidir com 'rascunho → publicação' da Fase 04"
   - id: MD-1
-    status: open
+    status: resolved
     summary: "Sem TD para política de formatos aceitos e validação do arquivo enviado"
+    resolved_by: phase-03-videos/TD-13
   - id: OQ-1
     status: open
     summary: "TD-01 pending — Background Queue Technology"
@@ -55,6 +56,9 @@ issues:
   - id: OQ-12
     status: open
     summary: "TD-12 pending — Testing Strategy for Storage, Queue and Worker"
+  - id: OQ-13
+    status: open
+    summary: "TD-13 pending — Accepted Formats and Upload Validation Policy"
 advisories: []
 ---
 
@@ -74,7 +78,7 @@ _None._
 
 ### Missing Decisions
 
-- **MD-1** — A capability "Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance" exige uma política de aceitação do arquivo que nenhuma TD decide: quais formatos/containers de vídeo são aceitos, onde a validação acontece (declaração de `content_type`/extensão no início do upload vs. verificação real por `ffprobe` no worker, com o vídeo indo para erro se não for vídeo) e como o limite de 10GB é aplicado (tamanho declarado no início vs. tamanho real do objeto ao completar). É uma decisão de limite/política citada em mais de um componente (DTO de início, worker, contrato OpenAPI). Explicit choice: run `/research phase 03` to add a TD covering accepted formats and upload validation policy.
+_None._
 
 ### Dependency Gaps
 
@@ -98,6 +102,7 @@ _None._
 - **OQ-10** — TD-10 pending — Video Status Lifecycle and Processing Failure Handling. Resolution: fill the **Decision:** field of TD-10 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
 - **OQ-11** — TD-11 pending — Access Policy for Video Endpoints in Phase 03. Resolution: fill the **Decision:** field of TD-11 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
 - **OQ-12** — TD-12 pending — Testing Strategy for Storage, Queue and Worker. Resolution: fill the **Decision:** field of TD-12 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
+- **OQ-13** — TD-13 pending — Accepted Formats and Upload Validation Policy. Resolution: fill the **Decision:** field of TD-13 in `docs/decisions/technical-decisions-phase-03-videos.md` (via `/plan-resolve phase-03-videos`), then re-run `/plan-validate phase-03-videos`.
 
 ### UI Coverage Gaps
 
@@ -105,4 +110,4 @@ _None._ _(UI↔API sync deferred — `## UI Inventory` carries the deferred plac
 
 ## Resolved Issues
 
-_No issues resolved yet._
+- **MD-1** _(resolved_by phase-03-videos/TD-13)_ — Sem TD para política de formatos aceitos e validação do arquivo enviado. Coberto pela TD-13 adicionada via `/research` (iteração validate → research → context → validate).
