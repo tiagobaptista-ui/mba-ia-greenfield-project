@@ -364,18 +364,155 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        RegisterDto: Record<string, never>;
-        ResendConfirmationDto: Record<string, never>;
-        LoginDto: Record<string, never>;
-        RefreshTokenDto: Record<string, never>;
-        ForgotPasswordDto: Record<string, never>;
-        ResetPasswordDto: Record<string, never>;
-        CreateVideoDto: Record<string, never>;
-        InitiatedUploadResponseDto: Record<string, never>;
-        PartUrlsResponseDto: Record<string, never>;
-        CompleteUploadDto: Record<string, never>;
-        CompletedUploadResponseDto: Record<string, never>;
-        VideoDetailsResponseDto: Record<string, never>;
+        RegisterDto: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        ResendConfirmationDto: {
+            /** Format: email */
+            email: string;
+        };
+        LoginDto: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        RefreshTokenDto: {
+            refresh_token: string;
+        };
+        ForgotPasswordDto: {
+            /** Format: email */
+            email: string;
+        };
+        ResetPasswordDto: {
+            token: string;
+            new_password: string;
+        };
+        CreateVideoDto: {
+            file_name: string;
+            /** @description Declared size in bytes; values above 10 GiB are rejected with VIDEO_TOO_LARGE. */
+            size_bytes: number;
+            /** @description One of video/mp4, video/webm, video/quicktime, video/x-matroska. */
+            content_type: string;
+            /** @description Defaults to the file name without extension. */
+            title?: string;
+        };
+        /** @enum {string} */
+        VideoStatus: "draft" | "processing" | "ready" | "failed";
+        InitiatedUploadResponseDto: {
+            /**
+             * Format: uuid
+             * @example 5b0c8a4e-6f7d-4a53-9b1e-2f4f0d6a9c11
+             */
+            id: string;
+            /**
+             * @description Unique URL identifier (11-char base62)
+             * @example aZ3kP9xQ2mB
+             */
+            slug: string;
+            /** @example minha-viagem */
+            title: string;
+            /** @example draft */
+            status: components["schemas"]["VideoStatus"];
+            /**
+             * @description Every part but the last has exactly this size
+             * @example 67108864
+             */
+            part_size_bytes: number;
+            /** @example 3 */
+            part_count: number;
+        };
+        SignedPartUrlDto: {
+            /** @example 1 */
+            part_number: number;
+            /**
+             * Format: uri
+             * @description Presigned UploadPart URL — PUT the part bytes and keep the ETag
+             */
+            url: string;
+        };
+        PartUrlsResponseDto: {
+            parts: components["schemas"]["SignedPartUrlDto"][];
+            /** @example 3600 */
+            expires_in_seconds: number;
+        };
+        UploadedPartDto: {
+            part_number: number;
+            /** @description ETag returned by the storage for the part's PUT. */
+            etag: string;
+        };
+        CompleteUploadDto: {
+            parts: components["schemas"]["UploadedPartDto"][];
+        };
+        CompletedUploadResponseDto: {
+            /**
+             * Format: uuid
+             * @example 5b0c8a4e-6f7d-4a53-9b1e-2f4f0d6a9c11
+             */
+            id: string;
+            /** @example aZ3kP9xQ2mB */
+            slug: string;
+            /** @example minha-viagem */
+            title: string;
+            /** @example processing */
+            status: components["schemas"]["VideoStatus"];
+        };
+        VideoMetadataDto: {
+            /** @example mov,mp4,m4a,3gp,3g2,mj2 */
+            container: string | null;
+            /** @example h264 */
+            video_codec: string | null;
+            /** @example aac */
+            audio_codec: string | null;
+            /** @example 1920 */
+            width: number | null;
+            /** @example 1080 */
+            height: number | null;
+            /** @example 29.97 */
+            fps: number | null;
+            /**
+             * @description Bits per second
+             * @example 4500000
+             */
+            bitrate: number | null;
+        };
+        VideoDetailsResponseDto: {
+            /**
+             * Format: uuid
+             * @example 5b0c8a4e-6f7d-4a53-9b1e-2f4f0d6a9c11
+             */
+            id: string;
+            /** @example aZ3kP9xQ2mB */
+            slug: string;
+            /** @example minha-viagem */
+            title: string;
+            /** @example ready */
+            status: components["schemas"]["VideoStatus"];
+            /** @example minha-viagem.mp4 */
+            original_file_name: string;
+            /** @example video/mp4 */
+            content_type: string;
+            /** @example 137282022 */
+            size_bytes: number;
+            /**
+             * @description Set by the worker once the video is ready
+             * @example 60
+             */
+            duration_seconds: number | null;
+            metadata: components["schemas"]["VideoMetadataDto"] | null;
+            /** @description Whether GET /videos/:slug/thumbnail can serve an image */
+            has_thumbnail: boolean;
+            /**
+             * @description Failure reason when status is failed
+             * @example null
+             */
+            processing_error: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         ApiErrorEnvelope: {
             /** @example 401 */
             statusCode: number;
@@ -407,7 +544,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": string;
+                };
             };
         };
     };
@@ -460,7 +599,9 @@ export interface operations {
     };
     AuthController_confirmEmail: {
         parameters: {
-            query?: never;
+            query: {
+                token: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -798,7 +939,10 @@ export interface operations {
     };
     VideosController_signPartUrls: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Comma-separated part numbers, e.g. `1,2,3` (max 100 per request). */
+                part_numbers: number[];
+            };
             header?: never;
             path: {
                 id: string;

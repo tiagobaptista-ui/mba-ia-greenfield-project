@@ -35,12 +35,12 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 The backend's OpenAPI spec is the single source of truth for every wire shape on the frontend (BFF handlers, MSW fixtures, component types). When an endpoint or DTO changes, regenerate the chain in this order:
 
 ```bash
-cd nestjs-project && docker compose exec nestjs-api npm run openapi:export   # writes nestjs-project/openapi.json
+cd nestjs-project && docker compose exec nestjs-api npm run openapi:export   # regenerates src/metadata.ts, writes nestjs-project/openapi.json
 bash scripts/sync-openapi.sh                                                  # from repo root, on the HOST
 cd next-frontend && docker compose exec next-frontend npm run openapi:types  # writes lib/api/types.gen.ts
 ```
 
-Commit `nestjs-project/openapi.json` and `next-frontend/lib/api/types.gen.ts` together (`next-frontend/openapi.json` is a git-ignored local copy that feeds the generator). Never hand-edit `types.gen.ts` or duplicate DTOs on the frontend.
+Commit `nestjs-project/src/metadata.ts`, `nestjs-project/openapi.json` and `next-frontend/lib/api/types.gen.ts` together (`next-frontend/openapi.json` is a git-ignored local copy that feeds the generator). Never hand-edit `types.gen.ts` or duplicate DTOs on the frontend.
 
 ## Docker Networking
 
