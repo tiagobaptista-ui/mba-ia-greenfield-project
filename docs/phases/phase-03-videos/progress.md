@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 3/12 completed
+**SIs:** 4/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -29,9 +29,11 @@
   - Fixed an SI-03.1 slip found by the full e2e run: `test/jest-e2e.json` has `rootDir: "."` resolved relative to `test/`, so its setup file is `<rootDir>/set-test-env.ts`.
 
 ### SI-03.4 — Criar fila video-processing e VideoProcessingProducer
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5 passing (`src/queue/video-processing.producer.integration-spec.ts` — real Redis: job `process-video` with `{ videoId }` and `jobId = videoId`, de-dup on double enqueue, `attempts: 3` + exponential backoff 1000 ms, keys under `QUEUE_PREFIX`; `src/queue/queue.module.spec.ts`)
+- **Observations:**
+  - Installed `@nestjs/bullmq@11.0.5` + `bullmq@5.81.5` (CJS line, peers with Nest 11 — `@nestjs/bullmq@12` is ESM-only, per library-refs).
+  - Job defaults live in `VIDEO_PROCESSING_JOB_OPTIONS` (`queue.constants.ts`) and are applied as the queue's `defaultJobOptions`.
 
 ### SI-03.5 — Implementar pré-cadastro do vídeo e início do upload
 - **Status:** pending
