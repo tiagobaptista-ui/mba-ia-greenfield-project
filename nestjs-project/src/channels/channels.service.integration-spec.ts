@@ -91,3 +91,44 @@ describe('ChannelsService (integration)', () => {
     });
   });
 });
+
+describe('ChannelsService.findByUserId (integration)', () => {
+  let dataSource: DataSource;
+  let channelsService: ChannelsService;
+
+  beforeAll(async () => {
+    dataSource = createTestDataSource(ALL_ENTITIES);
+    await dataSource.initialize();
+    channelsService = new ChannelsService(dataSource);
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+  });
+
+  beforeEach(async () => {
+    await cleanAllTables(dataSource);
+  });
+
+  it("should return the user's channel", async () => {
+    const user = await dataSource
+      .getRepository(User)
+      .save({ email: 'owner@example.com', password: 'hashed' });
+    const channel = await channelsService.createChannel(
+      user.id,
+      'owner@example.com',
+    );
+
+    const found = await channelsService.findByUserId(user.id);
+
+    expect(found?.id).toBe(channel.id);
+  });
+
+  it('should return null when the user has no channel', async () => {
+    const user = await dataSource
+      .getRepository(User)
+      .save({ email: 'nochannel@example.com', password: 'hashed' });
+
+    expect(await channelsService.findByUserId(user.id)).toBeNull();
+  });
+});

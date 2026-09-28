@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 4/12 completed
+**SIs:** 5/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -36,9 +36,13 @@
   - Job defaults live in `VIDEO_PROCESSING_JOB_OPTIONS` (`queue.constants.ts`) and are applied as the queue's `defaultJobOptions`.
 
 ### SI-03.5 — Implementar pré-cadastro do vídeo e início do upload
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 16 new passing — `src/videos/videos.service.spec.ts` (9: default title, explicit title, `part_count` 1/2/160, >10 GiB rejected before multipart, 3 × `UNSUPPORTED_VIDEO_FORMAT`, slug retry via SAVEPOINT, compensation abort), `src/videos/videos.service.integration-spec.ts` (3 — real DB + MinIO: draft persisted with `upload_id` and a writable multipart, distinct slugs, abort on persistence failure), `src/videos/slug.util.spec.ts` (2), `src/channels/channels.service.integration-spec.ts` (+2 `findByUserId`); `src/videos` + `src/channels` suites: 47 passing
+- **Observations:**
+  - Extracted the private `isPgUniqueViolationOnColumn` helper from `channels.service.ts` into `src/common/database/pg-errors.ts` so the video slug retry reuses it instead of duplicating it (channels behavior unchanged, its suite stays green).
+  - `generateVideoSlug` rejects bytes ≥ 248 so each base62 character is uniformly distributed (no modulo bias).
+  - Format check requires the extension to map to the declared `content_type` (e.g. `clip.mp4` + `video/webm` → `UNSUPPORTED_VIDEO_FORMAT`); `ffprobe` in the worker remains the authority on content (TD-13).
+  - `VideosModule` now provides `VideosService` (imports `StorageModule`, `ChannelsModule`).
 
 ### SI-03.6 — Implementar assinatura de partes, conclusão, aborto e consulta do upload
 - **Status:** pending
