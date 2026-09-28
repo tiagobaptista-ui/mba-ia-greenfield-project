@@ -38,3 +38,6 @@ export interface ProcessedVideoResult {
   metadata: VideoMetadata;
   thumbnail_key: string;
 }
+
+/** Public playback targets served by `GET /videos/:slug/{kind}` (TD-09). */
+export type PlaybackKind = 'stream' | 'download' | 'thumbnail';

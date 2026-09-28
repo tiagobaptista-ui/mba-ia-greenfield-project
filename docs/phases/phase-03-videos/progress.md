@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 10/12 completed
+**SIs:** 11/12 completed
 
 ### SI-03.1 — Infra: subir MinIO, Redis e FFmpeg no Compose
 - **Status:** completed
@@ -89,9 +89,11 @@
   - `VideosController` comes along with `VideosModule`, but an application context never binds routes; `WorkerModule` itself declares none.
 
 ### SI-03.11 — Expor streaming, download e thumbnail (endpoints públicos)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `test/videos-playback.e2e-spec.ts` (6 — authored from `nestjs-project/specs/videos-playback.plan.md`, `VideoProcessor` in-process on the test prefix: 1.1 anonymous stream → 302 to the `S3_PUBLIC_ENDPOINT` host, `Range: bytes=0-1023` → 206 `Content-Range: bytes 0-1023/<size>` + 1024 bytes; 2.1 download → 302, `Content-Disposition: attachment; filename="clipe.mp4"` + full body; 3.1 thumbnail → 302 to a JPEG `FF D8`; 4.1 unknown slug + `draft` + `processing` (worker paused) + `failed` (text file processed) → 404 `VIDEO_NOT_FOUND` on the 3 routes; 5.1 30 stream calls without 429; 6.1 POST → PUT parts → complete → worker → `ready` (duration, `video_codec`, `has_thumbnail`) → 206 with 100 bytes), `src/videos/videos.service.spec.ts` (+7 `getPlaybackUrl`: stream/download attachment name/thumbnail keys, unknown slug, `draft`/`processing`/`failed` → `VIDEO_NOT_FOUND`). Full e2e: 65 passing
+- **Observations:**
+  - Endpoints return `HttpRedirectResponse` through `@Redirect()` (context7 `/nestjs/docs.nestjs.com`, controllers → Redirection); playback never proxies bytes through the API.
+  - The slug routes (`/videos/:slug/{stream,download,thumbnail}`) have two segments, so they don't collide with the owner route `GET /videos/:id` (`ParseUUIDPipe`).
 
 ### SI-03.12 — Sincronizar contrato OpenAPI e documentar a fase
 - **Status:** pending

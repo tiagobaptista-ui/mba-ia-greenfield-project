@@ -34,6 +34,7 @@ import {
   SLUG_MAX_RETRIES,
 } from './videos.constants';
 import type {
+  PlaybackKind,
   ProcessedVideoResult,
   SignedPartUrls,
   UploadedPartInput,
@@ -209,6 +210,31 @@ export class VideosService {
     const uploadId = assertUploadInProgress(video);
     await this.storageService.abortMultipartUpload(video.storage_key, uploadId);
     await this.videoRepository.delete(video.id);
+  }
+
+  /**
+   * Public playback by the unique URL (TD-09, TD-11): a presigned GET on the public
+   * storage endpoint, which serves `Range` with `206`. Anything but a `ready` video is
+   * reported as not found, so drafts and failures never leak through the slug.
+   */
+  async getPlaybackUrl(slug: string, kind: PlaybackKind): Promise<string> {
+    const video = await this.videoRepository.findOneBy({ slug });
+    if (!video || video.status !== VideoStatus.READY) {
+      throw new VideoNotFoundException();
+    }
+    switch (kind) {
+      case 'stream':
+        return this.storageService.presignGetObject(video.storage_key);
+      case 'download':
+        return this.storageService.presignGetObject(video.storage_key, {
+          downloadFileName: video.original_file_name,
+        });
+      case 'thumbnail':
+        if (!video.thumbnail_key) {
+          throw new VideoNotFoundException();
+        }
+        return this.storageService.presignGetObject(video.thumbnail_key);
+    }
   }
 
   /** Worker lookup: `null` means the job refers to a video that no longer exists. */

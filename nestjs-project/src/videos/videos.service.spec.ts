@@ -465,3 +465,100 @@ describe('VideosService — upload lifecycle (unit)', () => {
     });
   });
 });
+
+describe('VideosService — getPlaybackUrl (unit)', () => {
+  const SIGNED = 'http://localhost:9000/streamtube-media/signed';
+
+  let videoRepository: {
+    findOneBy: jest.Mock<Promise<Video | null>, [unknown]>;
+  };
+  let storageService: {
+    presignGetObject: jest.Mock<
+      Promise<string>,
+      [string, { downloadFileName?: string }?]
+    >;
+  };
+  let service: VideosService;
+
+  const readyVideo = (overrides: Partial<Video> = {}): Video =>
+    ({
+      id: 'video-1',
+      slug: 'AbCdEfGhIjK',
+      status: VideoStatus.READY,
+      original_file_name: 'minha viagem.mp4',
+      storage_key: 'videos/video-1/original',
+      thumbnail_key: 'thumbnails/video-1.jpg',
+      ...overrides,
+    }) as Video;
+
+  beforeEach(() => {
+    videoRepository = {
+      findOneBy: jest
+        .fn<Promise<Video | null>, [unknown]>()
+        .mockResolvedValue(readyVideo()),
+    };
+    storageService = {
+      presignGetObject: jest
+        .fn<Promise<string>, [string, { downloadFileName?: string }?]>()
+        .mockResolvedValue(SIGNED),
+    };
+    service = new VideosService(
+      videoRepository as never,
+      {} as never,
+      storageService as unknown as StorageService,
+      {} as never,
+      {} as never,
+      {} as ConfigType<typeof storageConfig>,
+    );
+  });
+
+  it('should sign the original for streaming a ready video, looked up by slug', async () => {
+    await expect(service.getPlaybackUrl('AbCdEfGhIjK', 'stream')).resolves.toBe(
+      SIGNED,
+    );
+    expect(videoRepository.findOneBy).toHaveBeenCalledWith({
+      slug: 'AbCdEfGhIjK',
+    });
+    expect(storageService.presignGetObject).toHaveBeenCalledWith(
+      'videos/video-1/original',
+    );
+  });
+
+  it('should sign the original as an attachment named after the uploaded file for download', async () => {
+    await service.getPlaybackUrl('AbCdEfGhIjK', 'download');
+
+    expect(storageService.presignGetObject).toHaveBeenCalledWith(
+      'videos/video-1/original',
+      { downloadFileName: 'minha viagem.mp4' },
+    );
+  });
+
+  it('should sign the thumbnail object for the thumbnail', async () => {
+    await service.getPlaybackUrl('AbCdEfGhIjK', 'thumbnail');
+
+    expect(storageService.presignGetObject).toHaveBeenCalledWith(
+      'thumbnails/video-1.jpg',
+    );
+  });
+
+  it('should throw VIDEO_NOT_FOUND for an unknown slug', async () => {
+    videoRepository.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.getPlaybackUrl('unknown0000', 'stream'),
+    ).rejects.toBeInstanceOf(VideoNotFoundException);
+    expect(storageService.presignGetObject).not.toHaveBeenCalled();
+  });
+
+  it.each([VideoStatus.DRAFT, VideoStatus.PROCESSING, VideoStatus.FAILED])(
+    'should throw VIDEO_NOT_FOUND for a %s video',
+    async (status) => {
+      videoRepository.findOneBy.mockResolvedValue(readyVideo({ status }));
+
+      await expect(
+        service.getPlaybackUrl('AbCdEfGhIjK', 'download'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+      expect(storageService.presignGetObject).not.toHaveBeenCalled();
+    },
+  );
+});
